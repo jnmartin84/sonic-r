@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # KOS wav2adpcm tool
-WAV2ADPCM="/contents/wav2adpcm"
+WAV2ADPCM="/content/wav2adpcm"
 
 # Directory to process (default = current dir)
 DIR="${1:-.}"
