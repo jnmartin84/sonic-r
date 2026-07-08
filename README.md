@@ -1,6 +1,6 @@
 SONIC R
 
-This is a decompilation/remake of Sonic R for modern(ish) platforms.
+This is a decompilation/reimplementation of Sonic R for modern(ish) platforms.
 
 RIGHT NOW, You can generate a CDI of a beta version for the SEGA DREAMCAST.
 
