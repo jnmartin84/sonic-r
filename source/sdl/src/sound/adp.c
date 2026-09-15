@@ -3,6 +3,7 @@
  * stereo (wav2adpcm -n -i -t).
  */
 #include "adp.h"
+#include "path_ci.h"
 
 #include <string.h>
 
@@ -46,7 +47,7 @@ int Adp_Open(AdpDecoder *d, const char *path, int sampleRate, int channels)
         return -2;
     }
 
-    d->fp = fopen(path, "rb");
+    d->fp = sr_fOpenCI(path, "rb");
     if (!d->fp) {
         return -1;
     }

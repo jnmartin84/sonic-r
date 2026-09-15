@@ -12,6 +12,7 @@
 #include "music_rwops.h"
 #include "adx.h"
 #include "adp.h"
+#include "path_ci.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -233,7 +234,7 @@ static SDL_RWops *make_rw(MusicSrc *m)
 SDL_RWops *MusicRW_OpenSon(const char *path, uint32_t rate,
                            uint16_t channels, uint16_t bits)
 {
-    FILE *fp = fopen(path, "rb");
+    FILE *fp = sr_fOpenCI(path, "rb");
     if (!fp) {
         return NULL;
     }

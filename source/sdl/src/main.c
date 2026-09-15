@@ -579,8 +579,9 @@ int main(int argc, char *argv[])
     }
 
     /* Existence test via fopen (access() is absent from the KOS/newlib
-     * libc used by the Dreamcast build). */
-    FILE *probe = fopen(PATH_GENERAL_BIT, "rb");
+     * libc used by the Dreamcast build). fOpen is case-insensitivity-aware
+     * on desktop, so a mixed/lowercase data folder is accepted too. */
+    FILE *probe = fOpen(PATH_GENERAL_BIT, "rb");
     if (!probe) {
         fprintf(stderr,
                 "Game data not found here. Place the binary in the data folder, "

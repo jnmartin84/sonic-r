@@ -20,6 +20,7 @@
 #include "sonicr_globals.h"
 #include "sonicr_functions.h"
 #include "sonicr_paths.h"
+#include "path_ci.h"
 #include "replay_voice.h"
 
 extern void SetAllSoundVolumes(void);        /* 0x4D0760 */
@@ -283,7 +284,12 @@ static int LoadWAVIntoSlot(int slot, const char *filename)
     char path[512];
     snprintf(path, sizeof(path), DATA_DIR "/SOUND/SFX/%s", filename);
 
-    Mix_Chunk *chunk = Mix_LoadWAV(path);
+    /* SDL_mixer re-opens the path internally, so resolve the real on-disk
+     * casing on case-sensitive filesystems before handing it over. */
+    char *realPath = sr_resolve_case(path);
+    const char *loadPath = realPath ? realPath : path;
+    Mix_Chunk *chunk = Mix_LoadWAV(loadPath);
+    free(realPath);
     if (chunk == NULL) {
         DebugLog("SFX: failed to load slot 0x%02X (%s): %s\n", slot, filename, Mix_GetError());
         return 0;

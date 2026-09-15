@@ -89,9 +89,13 @@ can create them yourself if you prefer:
 | `SAVE`    | Save game (`SONICR.SAV`) and pad config     |
 | `GHOST`   | Time Attack ghost recordings                |
 
-> **Filenames must be UPPERCASE.** The original PC data ships in mixed case; on
-> case-sensitive filesystems (macOS, Linux) the folder and file names must be
-> uppercased or the game will fail to find its assets.
+> **Casing is handled automatically.** The engine builds its asset paths in
+> UPPERCASE to match the original data layout. On Windows and macOS
+> (case-insensitive filesystems) any casing works; on case-sensitive
+> filesystems (Linux, case-sensitive macOS volumes) the desktop build falls
+> back to a case-insensitive directory lookup, so a data folder copied
+> straight from the PC release loads without renaming. The Dreamcast disc
+> still needs uppercase ISO9660 names — see [dreamcast.md](dreamcast.md).
 
 ### Bundled extras — copy these in
 
@@ -221,7 +225,7 @@ sign out of the matchmaker, delete `ONLINE.DAT`.
 | Symptom                               | Fix                                                      |
 |---------------------------------------|----------------------------------------------------------|
 | "Cannot chdir to data directory"      | The path you passed doesn't exist — check it.            |
-| Black screen / missing textures       | Data folders missing or wrong case — uppercase them.     |
+| Black screen / missing textures       | Data folders missing or incomplete — check every required folder is present. |
 | Crash right after the logos           | Incomplete data set — make sure all folders are present. |
 | No music                              | Add a `MUSIC` folder with the track files.               |
 | Gamepad not detected                  | Check the pad works in another SDL game.                 |

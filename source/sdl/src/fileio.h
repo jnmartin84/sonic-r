@@ -27,7 +27,12 @@ int    sr_fError(FILE *file);
 #define fWrite(buffer, elementSize, elementCount, file) sr_fWrite((buffer), (elementSize), (elementCount), (file))
 #define fError(file)                                    sr_fError(file)
 #else
-#define fOpen(path, mode)                               fopen(path, mode)
+/* Desktop read opens fall back to a case-insensitive lookup when the exact
+ * (UPPERCASE) name isn't on disk, so mixed-case data copied from a Windows
+ * CD-ROM loads on case-sensitive filesystems. Writes keep the canonical
+ * names. See path_ci.c. */
+#include "path_ci.h"
+#define fOpen(path, mode)                               sr_fOpenCI((path), (mode))
 #define fRead(buffer, elementSize, elementCount, file)  fread(buffer, elementSize, elementCount, file)
 #define fSeek(file, offset, whence)                     fseek(file, offset, whence)
 #define fTell(file)                                     ftell(file)

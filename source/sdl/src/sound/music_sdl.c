@@ -13,6 +13,7 @@
 #include "sonicr_globals.h"
 #include "sonicr_functions.h"
 #include "sonicr_paths.h"
+#include "path_ci.h"
 #include "music_rwops.h"
 
 static Mix_Music *s_musicTrack = NULL;
@@ -137,10 +138,12 @@ static Mix_Music *load_track(int trackNum)
     static const char *const exts[] = { "ogg", "mp3", "flac", "wav" };
     for (int i = 0; i < (int)(sizeof(exts) / sizeof(exts[0])); i++) {
         snprintf(path, sizeof(path), DATA_DIR "/MUSIC/track%d.%s", trackNum, exts[i]);
-        FILE *tf = fopen(path, "rb");
-        if (tf) {
-            fclose(tf);
-            Mix_Music *mm = Mix_LoadMUS(path);
+        /* Case-sensitive filesystems: resolve the real on-disk casing before
+         * handing the path to SDL_mixer (which re-opens it internally). */
+        char *real = sr_resolve_case(path);
+        if (real) {
+            Mix_Music *mm = Mix_LoadMUS(real);
+            free(real);
             if (mm) return mm;
         }
     }
