@@ -129,6 +129,13 @@ void GL_UploadTpage(int tpage)
     if (!s_glTexturesInited) {
         GL_InitTextures();
     }
+#ifdef SONICR_XBOX
+    {
+        static int s_uploads;
+        if (s_uploads++ < 40)
+            fprintf(stderr, "upload tpage %d\n", tpage);
+    }
+#endif
 
     unsigned short *pixels = (unsigned short *)g_tpagePixelBuf[tpage];
     if (pixels == NULL) {

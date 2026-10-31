@@ -907,6 +907,12 @@ void platform_audio_shutdown(void)
 void platform_gl_swap(void)
 {
 #ifdef SONICR_XBOX
+    {
+        static int s_frames;
+        s_frames++;
+        if (s_frames <= 10 || s_frames % 120 == 0)
+            fprintf(stderr, "frame %d\n", s_frames);
+    }
     pbgl_swap_buffers();
     return;
 #endif

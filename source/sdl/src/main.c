@@ -780,7 +780,13 @@ title_sequence:
     InitCD();
     ResetInputState();
 
+#ifdef SONICR_XBOX
+    fprintf(stderr, "screen: SegaLogoScreen\n");
+#endif
     screenResult = SegaLogoScreen();
+#ifdef SONICR_XBOX
+    fprintf(stderr, "screen: SegaLogoScreen done (%d)\n", screenResult);
+#endif
     if (screenResult == SCREEN_QUIT) {
         return 0;
     }
@@ -788,7 +794,13 @@ title_sequence:
         return 0;
     }
 
+#ifdef SONICR_XBOX
+    fprintf(stderr, "screen: TravellersTalesLogoScreen\n");
+#endif
     screenResult = TravellersTalesLogoScreen();
+#ifdef SONICR_XBOX
+    fprintf(stderr, "screen: TravellersTalesLogoScreen done (%d)\n", screenResult);
+#endif
     if (screenResult == SCREEN_QUIT) {
         return 0;
     }
