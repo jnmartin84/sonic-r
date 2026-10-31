@@ -192,6 +192,9 @@ void LoadTitleTextureD3D(void)
      * tints). Mark it keep BEFORE the load triggers eager upload so
      * the buffer survives the post-upload free path. The other 5
      * tiles are static after load and don't need keep. */
+#ifdef SONICR_XBOX
+    { extern void xbox_log_mem(const char *); xbox_log_mem("wallpaper start"); }
+#endif
     XMARK("before keep");
     GL_KeepPixels((int)tbase);
     XMARK("keep done");
@@ -237,6 +240,11 @@ void LoadTitleTextureD3D(void)
     int rawSize = 640 * 480 * 3;
     unsigned char *rawBuf = malloc(rawSize);
     XMARK(rawBuf ? "rawBuf ok" : "rawBuf NULL");
+    if (rawBuf == NULL) {
+        /* Out of memory: skip this wallpaper instead of crashing in fRead. */
+        fClose(fp);
+        return;
+    }
 #ifdef SONICR_DC
     /* ~900KB is the largest single read in the game, and the DC fileio shim
      * (sr_fRead, save_vmu.c) holds io_lock across the whole underlying fread.

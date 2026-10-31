@@ -628,6 +628,9 @@ int main(int argc, char *argv[])
     if (platform_init(640, 480, s_cmdFullscreen, "Sonic R") != 0) {
         return 1;
     }
+#ifdef SONICR_XBOX
+    { extern void xbox_log_mem(const char *); xbox_log_mem("after platform_init"); }
+#endif
 
 #if 0
 def SONICR_DC /* DC splash screen */
@@ -714,8 +717,14 @@ def SONICR_DC /* DC splash screen */
 
     /* load SFX WAV files */
     InitDirectSound();
+#ifdef SONICR_XBOX
+    { extern void xbox_log_mem(const char *); xbox_log_mem("after InitDirectSound"); }
+#endif
 
     InitSonicR_A();
+#ifdef SONICR_XBOX
+    { extern void xbox_log_mem(const char *); xbox_log_mem("after InitSonicR_A"); }
+#endif
 
     /* Load saved key mappings (KEYS.BIN) */
     LoadKeyMappings();

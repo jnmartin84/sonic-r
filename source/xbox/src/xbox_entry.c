@@ -13,8 +13,22 @@
 #include <hal/xbox.h>
 #include <stdio.h>
 #include <windows.h>
+#include <xboxkrnl/xboxkrnl.h>
 
 extern int sonicr_main(int argc, char **argv);
+
+/* Log free physical memory, for tracking down out-of-memory failures. */
+void xbox_log_mem(const char *where)
+{
+    MM_STATISTICS st;
+    st.Length = sizeof(st);
+    if (NT_SUCCESS(MmQueryStatistics(&st))) {
+        fprintf(stderr, "mem[%s]: free %lu KB of %lu KB, heap committed %lu KB\n", where,
+                (unsigned long)st.AvailablePages * 4UL,
+                (unsigned long)st.TotalPhysicalPages * 4UL,
+                (unsigned long)st.VirtualMemoryBytesCommitted / 1024UL);
+    }
+}
 
 int main(void)
 {
@@ -27,6 +41,7 @@ int main(void)
         setvbuf(stderr, NULL, _IONBF, 0);
         fprintf(stderr, "Sonic R Xbox: started\n");
     }
+    xbox_log_mem("start");
     sonicr_main(1, argv);
     XReboot();
     return 0;
