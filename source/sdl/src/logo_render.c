@@ -32,6 +32,12 @@ extern void R_SetTpageGreen6(int tpage, int on);
 int g_nextLoadTpage = 0;
 const char *g_nextLoadFilename = NULL;
 
+#ifdef SONICR_XBOX
+#define XMARK(s) fprintf(stderr, "  mark: %s\n", (s))
+#else
+#define XMARK(s) ((void)0)
+#endif
+
 static const char *s_currentTitleFile = NULL;
 
 /* Display config */
@@ -186,7 +192,9 @@ void LoadTitleTextureD3D(void)
      * tints). Mark it keep BEFORE the load triggers eager upload so
      * the buffer survives the post-upload free path. The other 5
      * tiles are static after load and don't need keep. */
+    XMARK("before keep");
     GL_KeepPixels((int)tbase);
+    XMARK("keep done");
 
     /* These wallpapers are fully opaque, so they upload as RGB565 rather than
      * color-keyed ARGB1555 — one more bit of green and no alpha test. Flag it
@@ -196,6 +204,7 @@ void LoadTitleTextureD3D(void)
         R_SetNoColorKey((int)t);
     }
 
+    XMARK("nocolorkey done");
     for (unsigned int t = tbase; t < tbase + 6; t++) {
         if (g_tpagePixelBuf[t] == NULL) {
             g_tpagePixelBuf[t] = malloc(256 * 256 * 2);
@@ -210,6 +219,7 @@ void LoadTitleTextureD3D(void)
         R_SetTpageGreen6((int)t, 1);
     }
 
+    XMARK("alloc done");
     /* Open the RAW file */
     const char *filename = s_currentTitleFile;
     if (filename == NULL) {
@@ -222,9 +232,11 @@ void LoadTitleTextureD3D(void)
         return;
     }
 
+    XMARK("opened");
     /* Read entire 640x480x3 file */
     int rawSize = 640 * 480 * 3;
     unsigned char *rawBuf = malloc(rawSize);
+    XMARK(rawBuf ? "rawBuf ok" : "rawBuf NULL");
 #ifdef SONICR_DC
     /* ~900KB is the largest single read in the game, and the DC fileio shim
      * (sr_fRead, save_vmu.c) holds io_lock across the whole underlying fread.
@@ -253,6 +265,7 @@ void LoadTitleTextureD3D(void)
     fRead(rawBuf, 1, rawSize, fp);
 #endif
     fClose(fp);
+    XMARK("read done");
 
     /* Color key pass: bright green gets B+=8 */
     unsigned char *p = rawBuf;
@@ -291,6 +304,7 @@ void LoadTitleTextureD3D(void)
         }
     }
     free(rawBuf);
+    XMARK("converted");
 
     /* Mark each loaded tpage dirty so the renderer uploads to VRAM. The
      * DC backend's MarkDirty is eager, so this also performs the upload

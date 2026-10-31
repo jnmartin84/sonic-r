@@ -1,3 +1,6 @@
+#ifdef SONICR_XBOX
+#include <stdio.h>
+#endif
 /**
  * screens.c — Screen functions (game state machine screens)
  *
@@ -169,8 +172,17 @@ int TravellersTalesLogoScreen(void)
     LoadTPageRGB(0, DATA_DIR SEP "BIN" SEP "TITLES" SEP "TITLES00.RAW");
     SetTitleTextureFile(DATA_DIR SEP "BIN" SEP "TITLES" SEP "TTLOGO.RAW");
     LoadTitleTextureD3D();
+#ifdef SONICR_XBOX
+    fprintf(stderr, "  mark: TT LoadTitleTextureD3D returned\n");
+#endif
     ProcessTpageStates();
+#ifdef SONICR_XBOX
+    fprintf(stderr, "  mark: TT ProcessTpageStates done\n");
+#endif
     FinalizeMenuTexturesD3D();
+#ifdef SONICR_XBOX
+    fprintf(stderr, "  mark: TT FinalizeMenuTexturesD3D done\n");
+#endif
 #ifdef SONICR_DC
     if (RunningFromSlowMedia()) ResumeCD();
 #endif
