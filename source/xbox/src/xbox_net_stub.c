@@ -13,7 +13,9 @@ static int     s_localSlot;
 /* net_set_slot_platform / net_get_slot_platform / net_get_slot_region live in
  * net/network.c and are not part of the transport, so they are not stubbed. */
 
-int  net_transport_init(void)                                { return -1; }
+/* 0 = success: the game exits if init fails. "No network" is reported by the
+ * other calls instead (no session can be hosted or joined). */
+int  net_transport_init(void)                                { s_localSlot = 0; return 0; }
 int  net_host_start(int port)                                { (void)port; return -1; }
 int  net_client_connect(const char *host_ip, int port)       { (void)host_ip; (void)port; return -1; }
 int  net_send_to_host(const void *data, int len)             { (void)data; (void)len; return -1; }
