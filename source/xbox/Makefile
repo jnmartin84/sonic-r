@@ -39,7 +39,7 @@ include $(NXDK_DIR)/lib/pbgl/Makefile
 GAME_OBJS := $(addsuffix .obj,$(basename $(SRCS)))
 $(GAME_OBJS): CFLAGS += -std=gnu11 -Os -fno-common -w \
           -I$(SDL_SRC) -I$(XBOX_DIR)/include \
-          -DSONICR_SDL -DSONICR_XBOX -DSDL_MAIN_HANDLED \
+          -DSONICR_SDL -DSONICR_XBOX -DSONICR_DEBUG_LOG -DSDL_MAIN_HANDLED \
           -DDATA_DIR=\"D:\" \
           -include $(XBOX_DIR)/include/xbox_compat.h
 
