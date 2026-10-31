@@ -116,19 +116,19 @@ static Mix_Music *load_track(int trackNum)
     char path[512];
     SDL_RWops *rw;
 
-    snprintf(path, sizeof(path), DATA_DIR "/MUSIC/track%d.son", trackNum);
+    snprintf(path, sizeof(path), DATA_DIR SEP "MUSIC" SEP "track%d.son", trackNum);
     rw = MusicRW_OpenSon(path, 44100, 2, 16);
     if (rw) {
         return Mix_LoadMUS_RW(rw, 1);
     }
 
-    snprintf(path, sizeof(path), DATA_DIR "/MUSIC/track%d.adx", trackNum);
+    snprintf(path, sizeof(path), DATA_DIR SEP "MUSIC" SEP "track%d.adx", trackNum);
     rw = MusicRW_OpenAdx(path);
     if (rw) {
         return Mix_LoadMUS_RW(rw, 1);
     }
 
-    snprintf(path, sizeof(path), DATA_DIR "/MUSIC/track%d.adp", trackNum);
+    snprintf(path, sizeof(path), DATA_DIR SEP "MUSIC" SEP "track%d.adp", trackNum);
     rw = MusicRW_OpenAdp(path, 44100, 2);
     if (rw) {
         return Mix_LoadMUS_RW(rw, 1);
@@ -136,7 +136,7 @@ static Mix_Music *load_track(int trackNum)
 
     static const char *const exts[] = { "ogg", "mp3", "flac", "wav" };
     for (int i = 0; i < (int)(sizeof(exts) / sizeof(exts[0])); i++) {
-        snprintf(path, sizeof(path), DATA_DIR "/MUSIC/track%d.%s", trackNum, exts[i]);
+        snprintf(path, sizeof(path), DATA_DIR SEP "MUSIC" SEP "track%d.%s", trackNum, exts[i]);
         FILE *tf = fopen(path, "rb");
         if (tf) {
             fclose(tf);

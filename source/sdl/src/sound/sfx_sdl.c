@@ -281,7 +281,7 @@ static int LoadWAVIntoSlot(int slot, const char *filename)
     }
 
     char path[512];
-    snprintf(path, sizeof(path), DATA_DIR "/SOUND/SFX/%s", filename);
+    snprintf(path, sizeof(path), DATA_DIR SEP "SOUND" SEP "SFX" SEP "%s", filename);
 
     Mix_Chunk *chunk = Mix_LoadWAV(path);
     if (chunk == NULL) {

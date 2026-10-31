@@ -19,6 +19,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "platform.h"
+#ifdef SONICR_XBOX
+#include <hal/video.h>   /* XVideoSetMode */
+#include <pbgl.h>        /* OpenGL 1.x on the NV2A */
+#endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -435,6 +439,52 @@ int platform_init(int width, int height, int fullscreen, const char *title)
     memset(s_keystate, 0, sizeof(s_keystate));
     s_quitRequested = 0;
 
+#ifdef SONICR_XBOX
+    /* Original Xbox: no window system. SDL provides input and audio only;
+     * pbgl (pbkit) owns the framebuffer and the GPU. */
+    (void)fullscreen;
+    (void)title;
+    {
+        /* Prefer 1280x720 when the dashboard has 720p enabled; otherwise use
+         * the game's native 640x480 (480p/480i, whatever the dashboard picks).
+         * D:\VIDEO.TXT starting with '4' forces 480, starting with '7' forces 720.
+         * The renderer pillarboxes the 4:3 image inside whatever size is set. */
+        int want720 = 1;
+        FILE *cfg = fopen("D:\\VIDEO.TXT", "r");
+        if (cfg) {
+            int c = fgetc(cfg);
+            if (c == '4') want720 = 0;
+            fclose(cfg);
+        }
+        if (want720 && XVideoSetMode(1280, 720, 32, REFRESH_DEFAULT)) {
+            width = 1280;
+            height = 720;
+        } else if (XVideoSetMode(640, 480, 32, REFRESH_DEFAULT)) {
+            width = 640;
+            height = 480;
+        } else {
+            fprintf(stderr, "XVideoSetMode failed\n");
+            return -1;
+        }
+        s_fbWidth = width;
+        s_fbHeight = height;
+    }
+    if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
+        fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+        return -1;
+    }
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        fprintf(stderr, "Mix_OpenAudio failed: %s\n", Mix_GetError());
+        return -1;
+    }
+    pbgl_set_swap_interval(1);   /* vsync */
+    if (pbgl_init(GL_TRUE) != 0) {
+        fprintf(stderr, "pbgl_init failed\n");
+        return -1;
+    }
+    return 0;
+#endif
+
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 #ifdef _WIN32
     /* Win10+ blocks SetForegroundWindow from non-foreground processes; this
@@ -505,6 +555,13 @@ void platform_shutdown(void)
     }
     s_padCount = 0;
 
+#ifdef SONICR_XBOX
+    Mix_CloseAudio();
+    SDL_Quit();
+    pbgl_shutdown();
+    return;
+#endif
+
     if (g_sdlGLContext) {
         SDL_GL_DeleteContext(g_sdlGLContext);
         g_sdlGLContext = NULL;
@@ -525,6 +582,10 @@ const char *platform_base_path(void)
 {
 #if defined(__EMSCRIPTEN__)
     return NULL;
+#elif defined(SONICR_XBOX)
+    /* The XBE's own directory is mapped to D: when launched from the dashboard
+     * or xemu; game data sits beside default.xbe. */
+    return "D:\\";
 #else
     static char s_base[1024];
     static int s_have = 0;
@@ -845,6 +906,10 @@ void platform_audio_shutdown(void)
 
 void platform_gl_swap(void)
 {
+#ifdef SONICR_XBOX
+    pbgl_swap_buffers();
+    return;
+#endif
     if (g_sdlWindow) {
         SDL_GL_SwapWindow(g_sdlWindow);
     }
@@ -852,6 +917,11 @@ void platform_gl_swap(void)
 
 void platform_get_drawable_size(int *w, int *h)
 {
+#ifdef SONICR_XBOX
+    *w = s_fbWidth;
+    *h = s_fbHeight;
+    return;
+#endif
     if (g_sdlWindow) {
         SDL_GL_GetDrawableSize(g_sdlWindow, w, h);
     }

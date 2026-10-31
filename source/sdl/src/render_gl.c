@@ -57,7 +57,7 @@ int g_glViewportOffsetY = 0;
  * Matches PVR's native ARGB4444 format for DC portability. */
 static uint16_t __attribute__((aligned(32))) s_rgba4Storage[1024 * 256];
 
-#if SONICR_BIG_ENDIAN
+#if SONICR_BIG_ENDIAN || defined(SONICR_XBOX) /* pbgl has no RGB565 upload: use RGBA8 */
 /* RGBA8888 upload buffer for big-endian platforms.
  * Mesa's GL_UNSIGNED_SHORT_5_6_5 / GL_UNSIGNED_SHORT_5_5_5_1 packed formats
  * have byte-order bugs on PPC64 BE. GL_UNSIGNED_BYTE RGBA is unambiguous. */
@@ -177,7 +177,7 @@ void GL_UploadTpage(int tpage)
      * On LE: use packed 16-bit formats (GL_UNSIGNED_SHORT_5_6_5 / GL_UNSIGNED_SHORT_5_5_5_1). */
     int count = w * h;
 
-#if SONICR_BIG_ENDIAN
+#if SONICR_BIG_ENDIAN || defined(SONICR_XBOX) /* pbgl has no RGB565 upload: use RGBA8 */
     uint8_t *out8 = s_rgba8Storage;
     if (s_tpageNoColorKey[tpage]) {
         int green6 = s_tpageGreen6[tpage];
@@ -360,7 +360,7 @@ void GL_UploadTpageSubRect(int tpage, int destX, int destY, int width, int heigh
     /* Convert sub-rect to uploadable format using static buffer.
      * Sub-rect patches are only used for minimap updates which are color-keyed. */
     glBindTexture(GL_TEXTURE_2D, s_glTextures[tpage]);
-#if SONICR_BIG_ENDIAN
+#if SONICR_BIG_ENDIAN || defined(SONICR_XBOX) /* pbgl has no RGB565 upload: use RGBA8 */
     uint8_t *out8 = s_rgba8Storage;
     for (int row = 0; row < height; row++) {
         for (int col = 0; col < width; col++) {

@@ -22,3 +22,11 @@ update-repo.sh
 
 # OS / editor cruft
 .DS_Store
+
+# Xbox (nxdk) build outputs
+source/xbox/bin/
+source/xbox/*.exe
+source/xbox/*.lib
+source/xbox/*.iso
+*.obj
+*.d

@@ -17,7 +17,11 @@
 #endif
 
 /* Path separator */
+#ifdef SONICR_XBOX
+#define SEP         "\\"
+#else
 #define SEP         "/"
+#endif
 
 /* General data */
 #define PATH_GENERAL            DATA_DIR SEP "GENERAL" SEP
