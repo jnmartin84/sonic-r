@@ -61,8 +61,10 @@ static inline int fixmul16(int a, int b) {
  *                  EBX = height threshold (from player+0xa4).
  * Returns: lowest terrain height at that position, or 0 if none found.
  */
+extern void xbox_race_mark(const char *s);
 int SampleTerrainGrid(int worldX, int worldZ, int heightThreshold)
 {
+    xbox_race_mark("SampleTerrainGrid enter");
     /* 0x4d7c11-0x4d7c22: convert to world integer coords */
     int xInt = worldX >> 12;                             /* sar ebx, 0xc */
     int zInt = worldZ >> 12;                             /* sar ecx, 0xc */
@@ -301,6 +303,7 @@ void UpdateCameraConfig(CamStateEntry *camState, int flags)
  *
  * Watcom fastcall: EAX=player, EDX=cameraParams, EBX=renderCam, ECX=smoothedCam
  */
+extern void xbox_race_mark(const char *s);
 void BuildCameraView(Player *player, CamStateEntry *cameraParams,
                         RenderCamera *renderCam, CamStateEntry *smoothedCam)
 {
@@ -359,6 +362,7 @@ void BuildCameraView(Player *player, CamStateEntry *cameraParams,
      * ================================================================ */
 
     int camX, camY, camZ;
+    xbox_race_mark("BCV pos");
 
 
     /* INTRO FLYOVER CAMERA 0x42361b-0x42371f */
@@ -551,6 +555,7 @@ void BuildCameraView(Player *player, CamStateEntry *cameraParams,
     int divisor;
     int step;
      /* 0x42391b: mov edx, ecx; mov eax, esi; call 0x4234f4 */
+    xbox_race_mark("BCV smooth");
     SmoothCamera(player, (short *)smoothedCam);
 
     /* 0x423924-0x42393e: smooth X */
@@ -615,6 +620,7 @@ void BuildCameraView(Player *player, CamStateEntry *cameraParams,
     /* Binary: fild dz, fild dx, call 0x4e08fd (wrapper does fxch+fpatan).
      * fild dz→ST0=dz; fild dx→ST0=dx,ST1=dz; fxch→ST0=dz,ST1=dx;
      * fpatan = atan2(ST1=dx, ST0=dz) → C: atan2(dx, dz). */
+    xbox_race_mark("BCV atan2");
     sr_double yawRad = sr_atan2((sr_double)dx, (sr_double)dz);
     int yawAngle = (int)sr_lrint(yawRad * RAD_TO_ANGLE12);
     yawAngle = (yawAngle << 4) >> 4;                    /* sign-extend 28-bit */

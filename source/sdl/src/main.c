@@ -331,8 +331,19 @@ void SetupSpecialRace(void);            /* 0x00471AA0 */
  * Also calls UpdateCameraConfig before BuildCameraView, and
  * SetViewportClipRect( after, matching the binary's call sequence.
  *=========================================================== */
+int g_raceIterDbg;
+void xbox_race_mark(const char *s)
+{
+#ifdef SONICR_XBOX
+    if (g_raceIterDbg >= 1 && g_raceIterDbg <= 2) fprintf(stderr, "  cam: %s\n", s);
+#else
+    (void)s;
+#endif
+}
+
 void BuildCameraViewForViewport(int vpIdx)
 {
+    xbox_race_mark("BCVFV enter");
     Player *player = &g_playerBase[vpIdx];
     if (player == NULL) {
         return;
@@ -361,8 +372,11 @@ void BuildCameraViewForViewport(int vpIdx)
      * guarded by g_demoMode==0 && g_introCountdown==0, with per-player
      * input flags from g_perPlayerInput[]. See 0x4CF42D-0x4CF4A5.
      * Do NOT call UpdateCameraConfig here — it's handled in the main loop. */
+    xbox_race_mark("BuildCameraView call");
     BuildCameraView(player, camState, (void *)vpConfig, (void *)camState);
+    xbox_race_mark("SetViewportClipRect call");
     SetViewportClipRect(vpConfig);
+    xbox_race_mark("BCVFV done");
 
     /* Make render camera globally accessible */
     g_currentRenderCam = vpConfig;
@@ -1316,6 +1330,7 @@ race_start:
 #ifdef SONICR_XBOX
         static int s_raceIter;
         s_raceIter++;
+        g_raceIterDbg = s_raceIter;
 #define RACE_MARK(s) do { if (s_raceIter <= 6) fprintf(stderr, "race %d: %s\n", s_raceIter, (s)); } while (0)
 #else
 #define RACE_MARK(s) ((void)0)
@@ -1638,6 +1653,7 @@ race_start:
                 UpdateRaceObjects();
                 RACE_MARK("UpdateRaceRings");
                 UpdateRaceRings();
+                RACE_MARK("after UpdateRaceRings");
             }
             if (g_netSessionActive != 0 && g_netGameStarted != 0 &&
                 g_netGameStartState == 1 &&
@@ -1659,6 +1675,7 @@ race_start:
              *   g_demoMode==0 (normal race): BuildCameraView
              *   g_demoMode!=0 (time trial/replay): UpdateFlyoverCamera
              */
+            RACE_MARK("camera section");
             if (g_raceType == RACE_SPECIAL) {                       /* 0x4CF5AB */
                 /* Per binary 0x4CF5B4-0x4CF5C3: BuildCameraView is called
                  * with PLAYER 2's struct as the player arg, but viewport 0's
