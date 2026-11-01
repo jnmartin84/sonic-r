@@ -58,7 +58,8 @@ static int s_ready = 0;
  * ===================================================================== */
 typedef struct {
     const Sint16 *pcm;      /* chunk->abuf as S16, device fmt: stereo interleaved */
-    Uint32        frames;   /* length in stereo frames */
+    Uint32        frames;   /* length in frames (stereo, or mono samples if `mono`) */
+    int           mono;     /* Xbox: abuf is S16 mono at the source rate */
     Uint64        phase;    /* 32.32 fixed-point frame cursor; audio thread only */
     int           loop;
     SDL_atomic_t  freqHz;   /* live target frequency (game thread writes) */
@@ -112,6 +113,11 @@ static void SFX_VoiceEffect(int chan, void *stream, int len, void *udata)
     }
     int gain = SDL_AtomicGet(&v->gain);     /* 0..256 */
     Uint64 step = (Uint64)((double)freq / (double)SFX_BASE_RATE * 4294967296.0);
+#ifdef SONICR_XBOX
+    if (v->mono) {
+        step >>= 1;     /* source is 22050 Hz, output frames come at 44100 Hz */
+    }
+#endif
     Uint64 end = (Uint64)v->frames << 32;
     Uint64 phase = v->phase;
     int i = 0;
@@ -134,10 +140,20 @@ static void SFX_VoiceEffect(int chan, void *stream, int len, void *udata)
             idx1 = v->loop ? 0u : idx;
         }
 
-        Sint32 l0 = v->pcm[2*idx];
-        Sint32 l1 = v->pcm[2*idx1];
-        Sint32 r0 = v->pcm[2*idx + 1];
-        Sint32 r1 = v->pcm[2*idx1 + 1];
+        Sint32 l0, l1, r0, r1;
+#ifdef SONICR_XBOX
+        if (v->mono) {
+            l0 = r0 = v->pcm[idx];
+            l1 = r1 = v->pcm[idx1];
+        }
+        else
+#endif
+        {
+            l0 = v->pcm[2*idx];
+            l1 = v->pcm[2*idx1];
+            r0 = v->pcm[2*idx + 1];
+            r1 = v->pcm[2*idx1 + 1];
+        }
         Sint32 l = l0 + (Sint32)(((Sint64)(l1 - l0) * frac) >> 32);
         Sint32 r = r0 + (Sint32)(((Sint64)(r1 - r0) * frac) >> 32);
         l = (l * gain) >> 8;
@@ -167,7 +183,12 @@ static void SFX_PlayVoice(int slot, int gain256, int freqHz, int loop)
     Mix_UnregisterAllEffects(slot);         /* drop any stale effect/panning */
 
     v->pcm = (const Sint16 *)c->abuf;
+#ifdef SONICR_XBOX
+    v->mono = c->native_mono;
+    v->frames = v->mono ? (c->alen >> 1) : (c->alen >> 2);
+#else
     v->frames = c->alen >> 2;               /* stereo S16 */
+#endif
     v->phase = 0;
     v->loop = loop ? 1 : 0;
     SDL_AtomicSet(&v->freqHz, freqHz > 0 ? freqHz : SFX_BASE_RATE);
@@ -636,6 +657,12 @@ int SFX_ClipDurationMs(int slot)
         return 0;
     }
 
+#ifdef SONICR_XBOX
+    if (s_chunks[slot]->native_mono && s_chunks[slot]->native_freq > 0) {
+        return (int)(((Uint64)s_chunks[slot]->alen * 1000u) /
+                     (2u * (Uint64)s_chunks[slot]->native_freq));
+    }
+#endif
     int freq = 0;
     Uint16 fmt = 0;
     int channels = 0;

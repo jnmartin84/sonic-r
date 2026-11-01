@@ -18,6 +18,11 @@ typedef struct Mix_Chunk {
     Uint8  *abuf;
     Uint32  alen;
     Uint8   volume;
+    /* Xbox only: S16 mono sources are kept as loaded (abuf = S16 mono at
+     * native_freq) and resampled while mixing. Converting them to S16 stereo at
+     * the device rate would quadruple their size, and RAM is tight. */
+    int     native_mono;
+    int     native_freq;
 } Mix_Chunk;
 
 typedef struct _Mix_Music Mix_Music;

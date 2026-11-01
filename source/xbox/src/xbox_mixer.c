@@ -19,6 +19,7 @@
 typedef struct {
     Mix_Chunk       *chunk;
     Uint32           pos;        /* byte cursor into chunk->abuf */
+    Uint64           nphase;     /* 32.32 sample cursor for native_mono chunks */
     int              loops;      /* -1 = forever, else remaining repeats */
     int              playing;
     int              volume;     /* 0..128 */
@@ -71,6 +72,42 @@ static void mix_chunk_channel(int idx, Uint8 *out, int len)
 
     /* Fill from the chunk, honouring loops. */
     int filled = 0;
+    if (c->playing && c->chunk->native_mono) {
+        /* Mono source at its own rate: resample (linear) into S16 stereo. */
+        const Sint16 *src = (const Sint16 *)c->chunk->abuf;
+        Uint32 nsamp = c->chunk->alen >> 1;
+        Uint64 step = ((Uint64)c->chunk->native_freq << 32) / (Uint64)(s_spec.freq > 0 ? s_spec.freq : 44100);
+        Sint16 *dst = (Sint16 *)buf;
+        int frames = len / 4;
+        int i = 0;
+        for (; i < frames && c->playing && nsamp > 0; i++) {
+            Uint32 idx = (Uint32)(c->nphase >> 32);
+            while (idx >= nsamp) {
+                if (c->loops == -1 || c->loops > 0) {
+                    if (c->loops > 0) {
+                        c->loops--;
+                    }
+                    c->nphase -= (Uint64)nsamp << 32;
+                    idx = (Uint32)(c->nphase >> 32);
+                }
+                else {
+                    c->playing = 0;
+                    break;
+                }
+            }
+            if (!c->playing) {
+                break;
+            }
+            Uint32 idx1 = (idx + 1 < nsamp) ? idx + 1 : idx;
+            Sint32 s0 = src[idx];
+            Sint32 s1 = src[idx1];
+            Sint32 smp = s0 + (Sint32)(((Sint64)(s1 - s0) * (Sint64)(c->nphase & 0xFFFFFFFFu)) >> 32);
+            dst[2 * i]     = (Sint16)smp;
+            dst[2 * i + 1] = (Sint16)smp;
+            c->nphase += step;
+        }
+        filled = len;   /* the rest of buf stays zeroed */
+    }
     while (filled < len && c->playing) {
         Uint32 remain = c->chunk->alen - c->pos;
         if (remain == 0) {
@@ -227,6 +264,27 @@ Mix_Chunk *Mix_LoadWAV_RW(SDL_RWops *src, int freesrc)
         set_err(SDL_GetError());
         return NULL;
     }
+    if (spec.format == AUDIO_S16LSB && spec.channels == 1 && spec.freq > 0) {
+        /* Keep mono as loaded; see Mix_Chunk::native_mono. */
+        Mix_Chunk *n = (Mix_Chunk *)calloc(1, sizeof(*n));
+        Uint8 *copy = (Uint8 *)malloc(len ? len : 1);
+        if (!n || !copy) {
+            free(n);
+            free(copy);
+            SDL_FreeWAV(buf);
+            set_err("out of memory loading chunk");
+            return NULL;
+        }
+        memcpy(copy, buf, len);
+        SDL_FreeWAV(buf);
+        n->abuf = copy;
+        n->alen = len;
+        n->allocated = 1;
+        n->volume = MIX_MAX_VOLUME;
+        n->native_mono = 1;
+        n->native_freq = spec.freq;
+        return n;
+    }
     /* SDL_mixer converts to the device format at load time; sfx_sdl.c depends
      * on abuf being S16 stereo at the device rate. */
     if (SDL_BuildAudioCVT(&cvt, spec.format, spec.channels, spec.freq,
@@ -305,6 +363,7 @@ int Mix_PlayChannelTimed(int channel, Mix_Chunk *chunk, int loops, int ticks)
     Channel *c = &s_chan[channel];
     c->chunk = chunk;
     c->pos = 0;
+    c->nphase = 0;
     c->loops = loops;
     c->playing = 1;
     SDL_UnlockAudioDevice(s_dev);

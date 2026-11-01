@@ -154,7 +154,11 @@ static Mix_Music *load_track(int trackNum)
  */
 void PlayCD(int trackNum)
 {
+    static unsigned char s_trackMissing[22];   /* no file found: do not retry every frame */
     if (trackNum < 2 || trackNum > 21) {
+        return;
+    }
+    if (s_trackMissing[trackNum]) {
         return;
     }
     if (g_musicEnabled == 0) {
@@ -194,6 +198,7 @@ void PlayCD(int trackNum)
     if (s_musicTrack == NULL) {
         DebugLog("PlayCD(%i) — no loadable MUSIC/track%d.* found: %s\n",
                  trackNum, trackNum, Mix_GetError());
+        s_trackMissing[trackNum] = 1;
         return;
     }
 

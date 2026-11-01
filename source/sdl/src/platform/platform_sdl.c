@@ -445,15 +445,15 @@ int platform_init(int width, int height, int fullscreen, const char *title)
     (void)fullscreen;
     (void)title;
     {
-        /* Prefer 1280x720 when the dashboard has 720p enabled; otherwise use
-         * the game's native 640x480 (480p/480i, whatever the dashboard picks).
-         * D:\VIDEO.TXT starting with '4' forces 480, starting with '7' forces 720.
+        /* Default: the game's native 640x480 (480p/480i, whatever the dashboard
+         * picks). 720p costs several MB more video memory, so it is opt-in:
+         * D:\VIDEO.TXT starting with '7' asks for 1280x720 (if the dashboard allows).
          * The renderer pillarboxes the 4:3 image inside whatever size is set. */
-        int want720 = 1;
+        int want720 = 0;
         FILE *cfg = fopen("D:\\VIDEO.TXT", "r");
         if (cfg) {
             int c = fgetc(cfg);
-            if (c == '4') want720 = 0;
+            if (c == '7') want720 = 1;
             fclose(cfg);
         }
         if (want720 && XVideoSetMode(1280, 720, 32, REFRESH_DEFAULT)) {

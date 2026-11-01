@@ -85,20 +85,20 @@ if that folder is writable, so run from the hard drive, not from a disc image.
 
 ## Video mode
 
-The game renders at 640x480 (4:3). On startup the Xbox build picks:
+The game renders at 640x480 (4:3). By default the Xbox build uses **640x480**:
+480p if the dashboard has 480p enabled (HD AV pack), 480i if not.
 
-1. **1280x720** if 720p is enabled in the dashboard's video settings. The 4:3
-   image is pillarboxed in the middle (black bars left and right).
-2. Otherwise **640x480**: 480p if the dashboard has 480p enabled (HD AV pack),
-   480i if not.
-
-To force 480 even when 720p is enabled, create a text file `VIDEO.TXT` next to
-`default.xbe` whose first character is `4`.
+720p uses several MB more video memory and RAM is tight, so it is opt-in:
+create a text file `VIDEO.TXT` next to `default.xbe` whose first character is
+`7`. If the dashboard allows 720p the game then runs at 1280x720 with the 4:3
+image pillarboxed in the middle; otherwise it falls back to 640x480.
 
 ## Known limitations
 
 - No online play.
-- Memory: the original targets the Dreamcast (16 MB), so 64 MB should be fine,
-  but nothing has been measured at runtime yet.
+- Memory is the main constraint (64 MB total). Sound effects are kept in their
+  original mono 22.05 kHz format (about 8 MB) and resampled while mixing;
+  converting them to 44.1 kHz stereo used 32 MB and left no room for textures.
+  `SONICR.LOG` shows the free memory at several points.
 - Rendering relies on pbgl's fixed-function path; any texture or blend mode it
   does not implement will look wrong rather than crash.
