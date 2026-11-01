@@ -30,3 +30,4 @@ source/xbox/*.lib
 source/xbox/*.iso
 *.obj
 *.d
+source/xbox/main.map

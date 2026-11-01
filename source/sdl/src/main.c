@@ -1384,15 +1384,20 @@ race_start:
         RACE_MARK("after UpdateGameLogic");
         g_splashPrevState = g_interlaceMode;
         if (g_netSessionActive == 0 && g_isNetworkGame == 0) {
+            RACE_MARK("UpdatePerPlayerInput");
             UpdatePerPlayerInput();
         }
         /* [0x4CC9B4]: debug track/variant-select cheat — deliberately not
          * ported (debug keys unwired; the intro-countdown reset it was mistranslated as
          * is done for real in race_timing.c @ 0x4CB8C5). */
         if (g_netDisconnectFlag != 0 && g_fadeLevel == -256) {
+            RACE_MARK("StopCD");
             StopCD();
+            RACE_MARK("StopAmbientSounds");
             StopAmbientSounds();
+            RACE_MARK("InitOptionStuff");
             InitOptionStuff();
+            RACE_MARK("SelectCDTrack");
             SelectCDTrack();
             g_netSessionActive = 0;
             goto network_screen_entry;
@@ -1412,10 +1417,13 @@ race_start:
             g_fadeState = FADE_OUT;
         }
         if (g_raceResult == RACE_RESULT_ENDED && g_fadeLevel == -256) {
+            RACE_MARK("StopCD");
             StopCD();
+            RACE_MARK("StopAmbientSounds");
             StopAmbientSounds();
             if (g_demoMode != DEMO_NONE && g_musicEnabled == 1) {
                 g_optSfxVolume = g_optSfxVolumeSave;
+                RACE_MARK("SetAllSoundVolumes");
                 SetAllSoundVolumes();
             }
             if (g_demoMode == DEMO_TITLE) {
@@ -1427,6 +1435,7 @@ race_start:
                  * the later race-loop exit path. */
                 g_numHumans = 1;
                 g_numViewports = 1;
+                RACE_MARK("ApplyViewportGeometry");
                 ApplyViewportGeometry();
                 goto title_sequence;
             }
@@ -1442,6 +1451,7 @@ race_start:
                  * split across consecutive slots from 0x38, so starting it
                  * hands off to the sequencer, which also ducks the music for
                  * the length of the whole line. */
+                RACE_MARK("ReplayVoice_Start");
                 ReplayVoice_Start();
             }
 
@@ -1461,14 +1471,18 @@ race_start:
             g_playerBase[0].renderEnabled = 1;
 
             g_aiGridAngleOffset = g_aiGridAngleOffset & 0xFFF;
+            RACE_MARK("CheckRaceCompletion");
             CheckRaceCompletion();
             if (g_trackId != TRACK_RADIANT_EMERALD) {
+                RACE_MARK("UpdateWeatherEffects");
                 UpdateWeatherEffects();
             }
+            RACE_MARK("UpdateWeather");
             UpdateWeather();
             if (g_guideToggle == 1 && g_raceType == RACE_TIMEATTACK &&
                 g_raceSubMode < SUBMODE_TAG && g_trackId != TRACK_RADIANT_EMERALD)
             {
+                RACE_MARK("SpawnTAParticles");
                 SpawnTAParticles();
             }
             g_emeraldSineOffX = (g_emeraldSineOffX + 0x4D) & 0xFFF;
@@ -1485,6 +1499,7 @@ race_start:
                 memcpy(gdPkt + 6, g_netRecvInput, 8);
                 gdPkt[14] = 0;
                 gdPkt[15] = 0;
+                RACE_MARK("UpdateNetworkSync");
                 UpdateNetworkSync(gdPkt, 0x10);
             }
             /* Player pointer helper — original uses Watcom EAX register auto-advance */
@@ -1493,7 +1508,9 @@ race_start:
             if (g_postRaceCameraMode == 0) {
                 for (int i = 0; i < (int)g_numPlayers; i++) {
                     if (!net_should_run_physics(i)) continue;
+                    RACE_MARK("UpdatePlayerPhysicsA");
                     UpdatePlayerPhysicsA(PLAYER_PTR(i));
+                    RACE_MARK("UpdatePlayerPhysicsB");
                     UpdatePlayerPhysicsB(PLAYER_PTR(i));
                     if (g_raceSubMode < 2) {
                         UpdatePlayerLapSector(PLAYER_PTR(i));
@@ -1503,9 +1520,11 @@ race_start:
                     }
                 }
                 if (g_raceType != RACE_TIMEATTACK && g_raceSubMode != SUBMODE_TAG) {
+                    RACE_MARK("ComputeRacePositions");
                     ComputeRacePositions((int)g_numPlayers);
                 }
                 if (net_should_run_physics(0)) {
+                    RACE_MARK("UpdateHumanPlayerPhysics");
                     UpdateHumanPlayerPhysics(PLAYER_PTR(0), g_perPlayerInput[0]);
                 }
                 if (g_raceType == RACE_MULTIPLAYER) {
@@ -1542,12 +1561,15 @@ race_start:
                     }
                 }
                 else if (g_raceType == RACE_TIMEATTACK && g_raceSubMode < SUBMODE_TAG && g_ghostDataExists != 0) {
+                    RACE_MARK("UpdateHumanPlayerPhysics");
                     UpdateHumanPlayerPhysics(PLAYER_PTR(1), g_perPlayerInput[1]);
                 }
                 if (g_raceOrder[0] == 1) {
+                    RACE_MARK("PostRaceHandling2P");
                     PostRaceHandling2P();                /* 0x4C92B4 - binary 0x4CF3B7 */
                 }
                 else if (g_numPlayers == 5) {
+                    RACE_MARK("Update5PlayerRacePhysics");
                     Update5PlayerRacePhysics();
                 }
                 if (g_netWaitFlag == 0 || g_postRaceCameraMode != 0) {
@@ -1559,6 +1581,7 @@ race_start:
                     }
                 }
                 if (g_raceType == RACE_TIMEATTACK && g_raceSubMode < SUBMODE_TAG && g_numPlayers == 2) {
+                    RACE_MARK("UpdatePlayerMovement");
                     UpdatePlayerMovement(PLAYER_PTR(1));
                 }
 
@@ -1569,6 +1592,7 @@ race_start:
                 if (g_demoMode == DEMO_NONE && g_introCountdown == 0) {   /* 0x4CF42D, 0x4CF43A */
                     /* Binary passes raw g_perPlayerInput — no forced 0x40.
                      * Bit 6 (0x40) comes from the input system naturally. */
+                    RACE_MARK("UpdateCameraConfig");
                     UpdateCameraConfig(&g_camStateTable[0], (int)g_perPlayerInput[0]); /* VP 0 */
                     if (g_raceType == RACE_MULTIPLAYER) {          /* 0x4CF456: Multiplayer only */
                         UpdateCameraConfig(&g_camStateTable[1], (int)g_perPlayerInput[1]); /* VP 1 */
@@ -1583,24 +1607,36 @@ race_start:
             }
             if (g_netWaitFlag == 0 || g_postRaceCameraMode != 0) {
                 for (int i = 0; i < (int)g_numPlayers; i++) {
+                    RACE_MARK("TickPlayerAnimation");
                     TickPlayerAnimation(PLAYER_PTR(i));
                 }
             }
+            RACE_MARK("NetInterpApply");
             NetInterpApply();
+            RACE_MARK("SpawnPlayerParticleEffects");
             SpawnPlayerParticleEffects(PLAYER_PTR(0), 1);
             for (int i = 1; i < (int)g_numPlayers; i++) {
+                RACE_MARK("SpawnPlayerParticleEffects");
                 SpawnPlayerParticleEffects(PLAYER_PTR(i), 0);
             }
             if (g_postRaceCameraMode == 0) {
+                RACE_MARK("SpawnFootShadows");
                 SpawnFootShadows();
             }
+            RACE_MARK("UpdateTrackObjects");
             UpdateTrackObjects(g_collectEffectBuf);      /* 0x4C970A: EAX=0x907F20 */
+            RACE_MARK("UpdateMissiles");
             UpdateMissiles();                            /* l0x480D74 */
+            RACE_MARK("UpdateTrackWorld");
             UpdateTrackWorld();
+            RACE_MARK("AnimateTrackObjects");
             AnimateTrackObjects();
+            RACE_MARK("UpdatePlayfieldGridPositions");
             UpdatePlayfieldGridPositions();
             if (g_raceType != RACE_TIMEATTACK && g_postRaceCameraMode == 0) {
+                RACE_MARK("UpdateRaceObjects");
                 UpdateRaceObjects();
+                RACE_MARK("UpdateRaceRings");
                 UpdateRaceRings();
             }
             if (g_netSessionActive != 0 && g_netGameStarted != 0 &&
@@ -1612,6 +1648,7 @@ race_start:
                 memcpy(gdPkt2 + 4, &g_gameDataPacketFrame, 2);
                 memcpy(gdPkt2 + 6, g_netRecvInput, 8);
                 gdPkt2[14] = 0; gdPkt2[15] = 0;
+                RACE_MARK("UpdateNetworkSync");
                 UpdateNetworkSync(gdPkt2, 0x10);
             }
             /* Camera update: binary 0x4CF5AB-0x4CF6A9 (inlined)
@@ -1632,7 +1669,9 @@ race_start:
                 Player *player = &g_playerBase[2];
                 CamStateEntry *camState = &g_camStateTable[0];
                 int *vpConfig = (int *)((char *)g_viewportConfigArray + 0 * 0xC8);
+                RACE_MARK("BuildCameraView");
                 BuildCameraView(player, camState, (void *)vpConfig, (void *)camState);
+                RACE_MARK("SetViewportClipRect");
                 SetViewportClipRect(vpConfig);
                 g_currentRenderCam = vpConfig;
             }
@@ -1646,7 +1685,9 @@ race_start:
                 Player *player = &g_playerBase[localIdx];
                 CamStateEntry *camState = &g_camStateTable[localIdx];
                 int *vpConfig = (int *)((char *)g_viewportConfigArray + localIdx * 0xC8);
+                RACE_MARK("BuildCameraView");
                 BuildCameraView(player, camState, (void *)vpConfig, (void *)camState);
+                RACE_MARK("SetViewportClipRect");
                 SetViewportClipRect(vpConfig);
                 g_currentRenderCam = vpConfig;
             }
@@ -1666,12 +1707,14 @@ race_start:
                 }
             }
             if (g_trackId != TRACK_RADIANT_EMERALD) {
+                RACE_MARK("UpdateWeatherCounters");
                 UpdateWeatherCounters();                                     /* 0x4CF6B2 */
                 if (g_netSessionActive == 0 && g_isNetworkGame == 0) {
                     for (int vp = 0; vp < (int)g_numHumans; vp++) {
                         SpawnOtherParticle(vp);
                     }
                 } else {
+                    RACE_MARK("SpawnOtherParticle");
                     SpawnOtherParticle((int)(unsigned short)g_localPlayerIndex); /* 0x4CF6CB */
                 }
             }

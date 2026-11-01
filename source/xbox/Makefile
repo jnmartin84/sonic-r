@@ -32,6 +32,7 @@ SRCS := $(shell find $(SDL_SRC) -name '*.c' ! \( $(EXCLUDE) \)) \
         $(XBOX_DIR)/src/xbox_entry.c
 
 include $(NXDK_DIR)/Makefile
+LDFLAGS += /MAP:$(XBOX_DIR)/main.map
 include $(NXDK_DIR)/lib/pbgl/Makefile
 
 # These flags are scoped to the game's own objects: the force-included compat
