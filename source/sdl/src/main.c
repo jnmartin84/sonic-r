@@ -335,7 +335,7 @@ int g_raceIterDbg;
 void xbox_race_mark(const char *s)
 {
 #ifdef SONICR_XBOX
-    if (g_raceIterDbg >= 1 && g_raceIterDbg <= 2) fprintf(stderr, "  cam: %s\n", s);
+    if (g_raceIterDbg >= 1 && g_raceIterDbg <= 6) fprintf(stderr, "  cam: %s\n", s);
 #else
     (void)s;
 #endif

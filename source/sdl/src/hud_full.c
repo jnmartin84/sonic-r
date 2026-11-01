@@ -486,6 +486,7 @@ void DrawCollectEffectsD3D(CollectEffect *buf)  /* EAX = buffer */
  * RenderHUD — 0x004CD2A8 — 1257 bytes
  * Master HUD function. Two complete render paths (software + D3D).
  */
+extern void xbox_race_mark(const char *s);
 void RenderHUD(void)
 {
     unsigned int startViewport, viewportCount;
@@ -499,7 +500,9 @@ void RenderHUD(void)
         viewportCount = 1;
     }
 
+    xbox_race_mark("HUD ProcessTpageStates");
     ProcessTpageStates();
+    xbox_race_mark("HUD BeginFrame");
     BeginFrame();
 
     /* Background (full-screen) */
@@ -516,6 +519,7 @@ void RenderHUD(void)
     R_SetTileClipFullScreen();
 #endif
 
+    xbox_race_mark("HUD RenderBackground");
     RenderBackground();
 
     /* Per-viewport rendering */
@@ -622,11 +626,14 @@ void RenderHUD(void)
         }
 #endif
 
+        xbox_race_mark("HUD ComputeParallaxAndPlayfieldState");
         ComputeParallaxAndPlayfieldState(vp, g_currentRenderCam);
 
+        xbox_race_mark("HUD RenderParallaxStripsD3D");
         RenderParallaxStripsD3D((int)vp);
 
         if (g_trackId != TRACK_RADIANT_EMERALD) {
+            xbox_race_mark("HUD RenderWaterReflectionD3D");
             RenderWaterReflectionD3D((int)vp);
         }
 
@@ -635,12 +642,14 @@ void RenderHUD(void)
                 float *skyBase = &g_playfieldVertices[vp * 48];
                 float *skyUpper = skyBase + 24;
                 int *vpCfg = (int *)((char *)g_viewportConfigArray + vp * 0xC8);
+                xbox_race_mark("HUD RenderPlayfieldGridD3D");
                 RenderPlayfieldGridD3D(skyBase, skyUpper, vpCfg);
             }
         }
 
         if (g_demoMode == DEMO_NONE) {
             int hudPlayerIdx = (g_isNetworkGame != 0) ? g_localPlayerIndex : (int)vp;
+            xbox_race_mark("HUD DrawTimerAndStatus");
             DrawTimerAndStatus(hudPlayerIdx);
         }
 
@@ -656,34 +665,44 @@ void RenderHUD(void)
 //SONICR_DC
         R_SetFilter(R_FILTER_LINEAR);
 #endif
+        xbox_race_mark("HUD RenderTrackD3D");
         RenderTrackD3D();
 #ifdef BLURRY
 //SONICR_DC
         R_SetFilter(R_FILTER_NEAREST);
 #endif
+        xbox_race_mark("HUD RenderAllCharacterModels");
         RenderAllCharacterModels(g_numPlayers);
 
         if (g_raceSubMode == SUBMODE_BALLOON) {
+            xbox_race_mark("HUD AnimateBalloons");
             AnimateBalloons();
         }
 
+        xbox_race_mark("HUD DrawItemBoxD3D");
         DrawItemBoxD3D();
 
+        xbox_race_mark("HUD DrawCollectEffectsD3D");
         DrawCollectEffectsD3D(g_collectEffectBuf);
 
         if (SHADOWS_ENABLED(SPLIT_PICKUP_SHADOWS)) {
+            xbox_race_mark("HUD DrawPickupShadows");
             DrawPickupShadows();
         }
 
         if (g_trackId != TRACK_RADIANT_EMERALD) {
+            xbox_race_mark("HUD DrawGroundParticlesD3D");
             DrawGroundParticlesD3D((int)vp);
+            xbox_race_mark("HUD DrawSnowParticlesGate");
             DrawSnowParticlesGate(vp);
         }
 
         if (g_postRaceCameraMode == 0 && SHADOWS_ENABLED(SPLIT_FOOT_SHADOWS)) {
+            xbox_race_mark("HUD DrawFootShadows");
             DrawFootShadows();
         }
 
+        xbox_race_mark("HUD DrawOtherParticles");
         DrawOtherParticles();
 
         /* Demo/replay rotating "R" overlay — binary 0x4CD71B */
@@ -742,16 +761,20 @@ void RenderHUD(void)
 #endif
 
     if (g_numHumans > 1) {
+        xbox_race_mark("HUD DrawSplitBorder");
         DrawSplitBorder();
     }
 
+    xbox_race_mark("HUD DrawPauseOverlay");
     DrawPauseOverlay();
 
     /* Fade iris — 0x4cd48e: cmp [0x901c44], 0 / jge */
     if (g_fadeLevel < 0) {
+        xbox_race_mark("HUD RenderFadeOverlay");
         RenderFadeOverlay();                            /* 0x4cd497 */
     }
 
+    xbox_race_mark("HUD EndFrame");
     EndFrame();
 }
 
