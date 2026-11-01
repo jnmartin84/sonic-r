@@ -1313,6 +1313,14 @@ race_start:
     /* Race loop */
 
     while ((g_raceFinished == 0 || g_fadeState != FADE_VISIBLE) && (int)g_raceFinished < 5) {
+#ifdef SONICR_XBOX
+        static int s_raceIter;
+        s_raceIter++;
+#define RACE_MARK(s) do { if (s_raceIter <= 6) fprintf(stderr, "race %d: %s\n", s_raceIter, (s)); } while (0)
+#else
+#define RACE_MARK(s) ((void)0)
+#endif
+        RACE_MARK("loop top");
         /* PeekMessageA — SDL: pump events.
          * platform_pump_events updates s_keystate via HandleSDLEvent.
          * Copy to g_diKeyboardState so the game's input system sees the keys. */
@@ -1371,7 +1379,9 @@ race_start:
             ReadInput();
         }
 
+        RACE_MARK("before UpdateGameLogic");
         UpdateGameLogic();
+        RACE_MARK("after UpdateGameLogic");
         g_splashPrevState = g_interlaceMode;
         if (g_netSessionActive == 0 && g_isNetworkGame == 0) {
             UpdatePerPlayerInput();
@@ -1671,10 +1681,12 @@ race_start:
                     g_playerBase[p].ringCount = 999;
                 }
             }
+            RACE_MARK("before RenderHUD");
             if (g_skipThisFrame == 0) {
                 UpdateFrameTimers();
                 RenderHUD();
             }
+            RACE_MARK("after RenderHUD");
             g_raceElapsedDisplay = timeGetTime_ms() / 1000 - g_raceTimerDisplayBase;
             UpdateLapCounter(1);
             if (g_skipThisFrame == 0) {
@@ -1707,7 +1719,9 @@ render_frame:
             ;
         }
 
+        RACE_MARK("before FlipD3D");
         FlipD3D();                                       /* OpenGL: swapBuffers */
+        RACE_MARK("after FlipD3D");
 
         g_totalFrames2 = g_totalFrames2 + 1;
         if (g_netSessionActive != 0) {

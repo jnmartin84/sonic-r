@@ -214,8 +214,8 @@ void R_FlushState(void)
 
     /* Texture environment (overbright) */
     if (s_desired.texEnv != s_current.texEnv) {
-#ifdef __EMSCRIPTEN__
-        /* WebGL legacy GL emulation doesn't support GL_COMBINE/GL_ADD_SIGNED.
+#if defined(__EMSCRIPTEN__) || defined(SONICR_XBOX)
+        /* WebGL legacy GL emulation (and pbgl on the Xbox) doesn't support GL_COMBINE/GL_ADD_SIGNED.
          * Fall back to plain GL_MODULATE for all modes. */
         glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 #else

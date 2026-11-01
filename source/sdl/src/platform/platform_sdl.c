@@ -912,6 +912,15 @@ void platform_gl_swap(void)
         s_frames++;
         if (s_frames <= 10 || s_frames % 120 == 0)
             fprintf(stderr, "frame %d\n", s_frames);
+        {
+            /* Report the first few GL errors: they point at unsupported state. */
+            static int s_glErrors;
+            GLenum e;
+            while (s_glErrors < 30 && (e = glGetError()) != GL_NO_ERROR) {
+                fprintf(stderr, "GL error 0x%x (frame %d)\n", (unsigned)e, s_frames);
+                s_glErrors++;
+            }
+        }
     }
     pbgl_swap_buffers();
     return;
