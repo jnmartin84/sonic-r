@@ -31,6 +31,25 @@ void xbox_log_mem(const char *where)
 }
 
 
+/* fopen wrapper: relative paths ("BIN/OPTION/X.RAW", "SAVE/R01.SAV",
+ * "SONICR.INF") are taken as relative to D:\\, and '/' becomes '\\'. */
+#include <string.h>
+FILE *xb_fopen(const char *path, const char *mode)
+{
+    char buf[512];
+    size_t n = 0;
+    if (!path) return NULL;
+    while (path[0] == '.' && (path[1] == '/' || path[1] == '\\')) path += 2;
+    if (!strchr(path, ':')) {
+        memcpy(buf, "D:\\", 3);
+        n = 3;
+    }
+    for (; *path && n < sizeof(buf) - 1; path++)
+        buf[n++] = (*path == '/') ? '\\' : *path;
+    buf[n] = 0;
+    return fopen(buf, mode);
+}
+
 /* Last-chance logger for CPU exceptions (divide by zero, bad pointers, ...).
  * The kernel walks the handler chain at fs:[0]; this one logs the fault and the
  * code addresses found on the stack, then lets the kernel carry on (which hangs

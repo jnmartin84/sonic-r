@@ -27,7 +27,14 @@ int    sr_fError(FILE *file);
 #define fWrite(buffer, elementSize, elementCount, file) sr_fWrite((buffer), (elementSize), (elementCount), (file))
 #define fError(file)                                    sr_fError(file)
 #else
+#ifdef SONICR_XBOX
+/* The Xbox has no cwd and wants '\\' separators: xb_fopen prefixes D:\\ to
+ * relative paths and converts '/' (see source/xbox/src/xbox_entry.c). */
+FILE *xb_fopen(const char *path, const char *mode);
+#define fOpen(path, mode)                               xb_fopen(path, mode)
+#else
 #define fOpen(path, mode)                               fopen(path, mode)
+#endif
 #define fRead(buffer, elementSize, elementCount, file)  fread(buffer, elementSize, elementCount, file)
 #define fSeek(file, offset, whence)                     fseek(file, offset, whence)
 #define fTell(file)                                     ftell(file)
