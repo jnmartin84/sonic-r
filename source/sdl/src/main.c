@@ -332,9 +332,14 @@ void SetupSpecialRace(void);            /* 0x00471AA0 */
  * SetViewportClipRect( after, matching the binary's call sequence.
  *=========================================================== */
 int g_raceIterDbg;
+#ifdef SONICR_XBOX
+extern volatile const char *g_lastMark;
+#endif
+extern volatile const char *g_lastMark;
 void xbox_race_mark(const char *s)
 {
 #ifdef SONICR_XBOX
+    g_lastMark = s;
     if (g_raceIterDbg >= 1 && g_raceIterDbg <= 6) fprintf(stderr, "  cam: %s\n", s);
 #else
     (void)s;
@@ -1331,7 +1336,7 @@ race_start:
         static int s_raceIter;
         s_raceIter++;
         g_raceIterDbg = s_raceIter;
-#define RACE_MARK(s) do { if (s_raceIter <= 6) fprintf(stderr, "race %d: %s\n", s_raceIter, (s)); } while (0)
+#define RACE_MARK(s) do { g_lastMark = (s); if (s_raceIter <= 6) fprintf(stderr, "race %d: %s\n", s_raceIter, (s)); } while (0)
 #else
 #define RACE_MARK(s) ((void)0)
 #endif

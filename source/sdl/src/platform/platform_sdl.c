@@ -488,6 +488,10 @@ int platform_init(int width, int height, int fullscreen, const char *title)
         fprintf(stderr, "pbgl_init failed\n");
         return -1;
     }
+    {
+        extern void xbox_start_watchdog(void);
+        xbox_start_watchdog();
+    }
     return 0;
 #endif
 
@@ -910,14 +914,48 @@ void platform_audio_shutdown(void)
  * SDL platform helpers for render_gl.c
  * ===================================================================== */
 
+#ifdef SONICR_XBOX
+volatile const char *g_lastMark = "start";
+volatile int g_xbFrames;
+static int xb_watchdog(void *arg)
+{
+    int last = -1, stalled = 0;
+    (void)arg;
+    for (;;) {
+        SDL_Delay(1000);
+        if (g_xbFrames == last) {
+            stalled++;
+            if (stalled == 4 || (stalled > 4 && stalled % 10 == 0))
+                fprintf(stderr, "WATCHDOG: no frame for %d s, last mark: %s\n", stalled,
+                        (const char *)g_lastMark);
+        } else {
+            stalled = 0;
+            last = g_xbFrames;
+        }
+    }
+    return 0;
+}
+void xbox_start_watchdog(void) { SDL_CreateThread(xb_watchdog, "watchdog", NULL); }
+#endif
+
 void platform_gl_swap(void)
 {
 #ifdef SONICR_XBOX
     {
         static int s_frames;
         s_frames++;
+        g_xbFrames = s_frames;
         if (s_frames <= 10 || s_frames % 120 == 0)
             fprintf(stderr, "frame %d\n", s_frames);
+        if (s_frames % 120 == 0 || s_frames < 4) {
+            extern int g_dbgDraws[53]; extern float g_dbgVert[53][6];
+            for (int t = 0; t < 53; t++) if (g_dbgDraws[t]) {
+                fprintf(stderr, "  draws tpage %d: %d  v0=(%.1f,%.1f,z%.3f,rhw%.4f,a%.0f) st=%.0f\n", t,
+                        g_dbgDraws[t], g_dbgVert[t][0], g_dbgVert[t][1], g_dbgVert[t][2],
+                        g_dbgVert[t][3], g_dbgVert[t][4], g_dbgVert[t][5]);
+                g_dbgDraws[t] = 0;
+            }
+        }
         {
             /* Report the first few GL errors: they point at unsupported state. */
             static int s_glErrors;

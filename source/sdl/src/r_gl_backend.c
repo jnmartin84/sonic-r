@@ -459,11 +459,25 @@ static inline void R_EmitVertex(const RenderVertex *v)
     glVertex4f(v->sx * w, v->sy * w, v->sz * w, w);
 }
 
+#ifdef SONICR_XBOX
+/* Per-tpage draw statistics for on-hardware debugging (see platform_gl_swap). */
+int   g_dbgDraws[53];
+float g_dbgVert[53][6];
+#endif
 void R_DrawTriFan(const RenderVertex *v, int count)
 {
     if (count < 3) {
         return;
     }
+#ifdef SONICR_XBOX
+    {
+        int ti = (s_desired.textureId >= 0 && s_desired.textureId < 52) ? s_desired.textureId : 52;
+        g_dbgDraws[ti]++;
+        g_dbgVert[ti][0] = v[0].sx; g_dbgVert[ti][1] = v[0].sy; g_dbgVert[ti][2] = v[0].sz;
+        g_dbgVert[ti][3] = v[0].rhw; g_dbgVert[ti][4] = (float)(v[0].color >> 24);
+        g_dbgVert[ti][5] = (float)(s_desired.blendMode * 100 + s_desired.depthTest * 10 + s_desired.alphaTest);
+    }
+#endif
 
     R_FlushState();
 
