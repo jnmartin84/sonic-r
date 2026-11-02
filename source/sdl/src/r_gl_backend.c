@@ -445,10 +445,16 @@ void R_ResetState(void)
 
 /* Emit a single vertex via GL immediate mode.
  * Uses glVertex4f with W=1/RHW for perspective-correct interpolation. */
+#ifdef SONICR_XBOX
+extern int g_dbgMode;
+#endif
 static inline void R_EmitVertex(const RenderVertex *v)
 {
     uint32_t argb = v->color;
     float a = (float)((argb >> 24) & 0xFF) / 255.0f;
+#ifdef SONICR_XBOX
+    if (g_dbgMode == 3 || g_dbgMode == 4) a = 1.0f;
+#endif
     float r = (float)((argb >> 16) & 0xFF) / 255.0f;
     float g = (float)((argb >>  8) & 0xFF) / 255.0f;
     float b = (float)((argb      ) & 0xFF) / 255.0f;
@@ -461,6 +467,7 @@ static inline void R_EmitVertex(const RenderVertex *v)
 
 #ifdef SONICR_XBOX
 /* Per-tpage draw statistics for on-hardware debugging (see platform_gl_swap). */
+int   g_dbgMode;     /* Back button cycles 0..4 for on-hardware experiments */
 int   g_dbgDraws[53];
 float g_dbgVert[53][6];
 #endif
@@ -480,6 +487,12 @@ void R_DrawTriFan(const RenderVertex *v, int count)
 #endif
 
     R_FlushState();
+#ifdef SONICR_XBOX
+    if (g_dbgMode == 2 || g_dbgMode == 4) {
+        glDisable(GL_DEPTH_TEST);
+        s_current.depthTest = -1;     /* force re-sync on the next flush */
+    }
+#endif
 
     glBegin(GL_TRIANGLE_FAN);
     for (int i = 0; i < count; i++) {
