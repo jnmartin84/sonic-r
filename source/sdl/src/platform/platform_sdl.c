@@ -22,6 +22,7 @@
 #ifdef SONICR_XBOX
 #include <hal/video.h>   /* XVideoSetMode */
 #include <pbgl.h>        /* OpenGL 1.x on the NV2A */
+#include <pbkit/pbkit.h>
 #endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -478,6 +479,11 @@ int platform_init(int width, int height, int fullscreen, const char *title)
         return -1;
     }
     pbgl_set_swap_interval(1);   /* vsync */
+    /* pbkit's push buffer is only reset once per frame, and the game draws with
+     * immediate-mode glVertex calls (~60 bytes each). The default 512 KB filled
+     * up in busy frames (GPU error "DMA push buffer engine encountered invalid
+     * data"), so use 4 MB. Must be set before pb_init (called by pbgl_init). */
+    pb_size(4 * 1024 * 1024);
     if (pbgl_init(GL_TRUE) != 0) {
         fprintf(stderr, "pbgl_init failed\n");
         return -1;
@@ -922,7 +928,23 @@ void platform_gl_swap(void)
             }
         }
     }
-    pbgl_swap_buffers();
+    {
+        /* Track how much push buffer a frame uses (dwords); log new maxima. */
+        static uint32_t *s_pbStart;
+        static unsigned s_pbMax;
+        uint32_t *cur = pb_begin();
+        pb_end(cur);
+        if (s_pbStart && cur > s_pbStart) {
+            unsigned used = (unsigned)(cur - s_pbStart) * 4u;
+            if (used > s_pbMax + 65536u) {
+                s_pbMax = used;
+                fprintf(stderr, "pushbuffer: frame used %u KB\n", used / 1024u);
+            }
+        }
+        pbgl_swap_buffers();
+        s_pbStart = pb_begin();
+        pb_end(s_pbStart);
+    }
     return;
 #endif
     if (g_sdlWindow) {
