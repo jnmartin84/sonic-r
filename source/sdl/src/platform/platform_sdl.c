@@ -981,6 +981,30 @@ void platform_gl_swap(void)
         s_frames++;
         g_xbFrames = s_frames;
         {
+            /* IGR (in-game reset), the homebrew convention: hold L + R triggers
+             * + Back + Black on any pad for half a second -> back to the
+             * dashboard, same path as Options > Exit to Dashboard. */
+            static int s_igrHeld;
+            int combo = 0;
+            for (int i = 0; i < s_padCount && i < MAX_GAMEPADS; i++) {
+                SDL_GameController *c = s_pads[i].ctrl;
+                if (c &&
+                    SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > TRIGGER_THRESHOLD_I &&
+                    SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > TRIGGER_THRESHOLD_I &&
+                    SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_BACK) &&
+                    SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) {   /* Black */
+                    combo = 1;
+                    break;
+                }
+            }
+            s_igrHeld = combo ? s_igrHeld + 1 : 0;
+            if (s_igrHeld >= 15) {
+                fprintf(stderr, "IGR: reset requested\n");
+                fflush(stderr);
+                exit(0);   /* atexit handler idles the audio and does the full reboot */
+            }
+        }
+        {
             /* Back button cycles debug render modes (0 = normal). */
             extern int g_dbgMode;
             static int s_backPrev;
