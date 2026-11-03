@@ -19,6 +19,9 @@
 #include "net_transport.h"
 #include "r_draw.h"
 #include <stdarg.h>
+#ifdef SONICR_XBOX
+#include "xbox_menu_patch.h"
+#endif
 
 void SoftwareRenderSortedPolygons(void);
 void FlipSoftware(void);
@@ -1141,6 +1144,11 @@ int OptionsMenuScreen(void)
     LoadTPageRGB(g_uiTexPage, PATH_GENERAL_RAW);                     /* 0x493c8e */
     TintBackgroundTPage(g_bgTintR, g_bgTintG, g_bgTintB);           /* 0x493ca4 */
     LoadTPageRGB(g_uiTexPage + 1, PATH_MENU_OPTIONS0);
+#ifdef SONICR_XBOX
+    /* "Exit to Windows" makes no sense on the console: relabel it. */
+    xb_patch_exit_to_dashboard((unsigned short *)g_tpagePixelBuf[g_uiTexPage + 1],
+                               g_bitsPerPixel == 0x10);
+#endif
     LoadTPageRGB(g_uiTexPage + 2, PATH_MENU_OPTIONS1);
     LoadTPageRGB(g_uiTexPage + 3, PATH_MENU_CONTROLS);
     /* Restore state 4 for loaded tpages (same pattern as MainMenuScreen) */
