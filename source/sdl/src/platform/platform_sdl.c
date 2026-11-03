@@ -917,6 +917,7 @@ void platform_audio_shutdown(void)
 #ifdef SONICR_XBOX
 volatile const char *g_lastMark = "start";
 volatile int g_xbFrames;
+extern int g_dbgMode;
 static int xb_watchdog(void *arg)
 {
     int last = -1, stalled = 0;
@@ -952,7 +953,7 @@ void platform_gl_swap(void)
             int back = (s_pads[0].ctrl &&
                         SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_BACK)) ? 1 : 0;
             if (back && !s_backPrev) {
-                g_dbgMode = (g_dbgMode + 1) % 5;
+                g_dbgMode = (g_dbgMode + 1) % 9;
                 fprintf(stderr, "DEBUG MODE -> %d (frame %d)\n", g_dbgMode, s_frames);
             }
             s_backPrev = back;
@@ -961,14 +962,14 @@ void platform_gl_swap(void)
             /* Log frames that took unusually long (stutter hunting). */
             static unsigned s_lastTick;
             unsigned now = (unsigned)SDL_GetTicks();
-            if (s_lastTick && now - s_lastTick > 70 && s_frames > 30)
+            if (s_lastTick && now - s_lastTick > 150 && s_frames > 30)
                 fprintf(stderr, "slow frame %d: %u ms (mark: %s)\n", s_frames, now - s_lastTick,
                         (const char *)g_lastMark);
             s_lastTick = now;
         }
-        if (s_frames <= 10 || s_frames % 120 == 0)
+        if (s_frames <= 3 || s_frames % 600 == 0)
             fprintf(stderr, "frame %d\n", s_frames);
-        if (s_frames % 120 == 0 || s_frames < 4) {
+        if (s_frames % 600 == 0 || s_frames < 4) {
             extern int g_dbgDraws[53]; extern float g_dbgVert[53][6];
             for (int t = 0; t < 53; t++) if (g_dbgDraws[t]) {
                 fprintf(stderr, "  draws tpage %d: %d  v0=(%d,%d,z*1e6=%d,rhw*1e6=%d,a%d) st=%d\n", t,

@@ -221,6 +221,21 @@ void GL_UploadTpage(int tpage)
     }
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, out8);
+#ifdef SONICR_XBOX
+    {
+        /* Content statistics of what was just uploaded (debugging blank menus). */
+        static int s_stat;
+        if (s_stat++ < 150) {
+            unsigned long sr = 0, sg = 0, sb = 0; int a0 = 0;
+            for (int i = 0; i < count; i++) {
+                sr += out8[i*4]; sg += out8[i*4+1]; sb += out8[i*4+2];
+                if (out8[i*4+3] == 0) a0++;
+            }
+            fprintf(stderr, "  tex %d %dx%d: transparent=%d/%d avgRGB=%lu,%lu,%lu nokey=%d\n", tpage, w, h,
+                    a0, count, sr / count, sg / count, sb / count, s_tpageNoColorKey[tpage]);
+        }
+    }
+#endif
 #else
     uint16_t *out = s_rgba4Storage;
     if (s_tpageNoColorKey[tpage]) {
@@ -1142,3 +1157,42 @@ void FinalizeMenuTexturesD3D(void)
 }
 
 #endif /* !SONICR_SOFT_RENDER */
+
+
+#ifdef SONICR_XBOX
+/* On-hardware debugging: draw a tpage's texture as an opaque 256x256 square in
+ * the top-left corner so its real content can be seen (Back button cycles the
+ * debug modes; see platform_gl_swap). Called after the frame is finished. */
+extern void R_ResetState(void);
+void GL_DebugViewTpage(int tp, int x, int y, int size)
+{
+    if (tp < 0 || tp >= 52 || g_tpagePixelBuf[tp] == NULL) {
+        return;
+    }
+    if (s_glTextureDirty[tp]) {
+        GL_UploadTpage(tp);
+    }
+    glViewport(0, 0, 640, 480);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_CULL_FACE);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, 640, 480, 0, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, s_glTextures[tp]);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0f, 0.0f); glVertex2f((float)x, (float)y);
+    glTexCoord2f(1.0f, 0.0f); glVertex2f((float)(x + size), (float)y);
+    glTexCoord2f(1.0f, 1.0f); glVertex2f((float)(x + size), (float)(y + size));
+    glTexCoord2f(0.0f, 1.0f); glVertex2f((float)x, (float)(y + size));
+    glEnd();
+    R_ResetState();
+}
+#endif
