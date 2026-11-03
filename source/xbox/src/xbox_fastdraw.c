@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <pbkit/pbkit.h>
 
+#include <stdio.h>
 #include "GL/gl.h"
 #include "GL/glext.h"
 #include "types.h"
@@ -28,6 +29,12 @@ static int s_open;
  * end and corrupts whatever memory follows (textures, geometry). Reset mid-frame
  * (GPU drains, then jumps back to head) when the buffer gets 3/4 full. */
 uint32_t *xb_pb_head;
+int xb_pb_resets;
+static void xb_pb_note(void)
+{
+    if (++xb_pb_resets <= 20)
+        fprintf(stderr, "pushbuffer: mid-frame reset #%d\n", xb_pb_resets);
+}
 #define XB_PB_LIMIT_DWORDS (96 * 1024)
 
 void xb_batch_end(void)
@@ -45,6 +52,7 @@ void xb_draw_fan(const float *verts, int n)
         pb_end(s_p);
         s_open = 0;
         pb_reset();
+        xb_pb_note();
     }
     if (!s_open) {
         pbgl_state_flush();
@@ -52,6 +60,7 @@ void xb_draw_fan(const float *verts, int n)
         if (xb_pb_head && (s_p - xb_pb_head) > XB_PB_LIMIT_DWORDS) {
             pb_end(s_p);
             pb_reset();
+            xb_pb_note();
             s_p = pb_begin();
         }
         s_open = 1;
