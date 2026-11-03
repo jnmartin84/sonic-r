@@ -1,4 +1,4 @@
-# Sonic R on the original Xbox (experimental)
+# Sonic R on the original Xbox
 
 *Back to the [README](../README.md).*
 
@@ -102,3 +102,16 @@ image pillarboxed in the middle; otherwise it falls back to 640x480.
   `SONICR.LOG` shows the free memory at several points.
 - Rendering relies on pbgl's fixed-function path; any texture or blend mode it
   does not implement will look wrong rather than crash.
+- Known visual bugs: stretched or missing floor textures on some tracks
+  (Factory), brief black flashes, and a texture that sometimes disappears.
+  Under investigation.
+
+## Credits
+
+- **jnmartin84**: the Sonic R decompilation and the cross-platform engine this
+  port is built on.
+- **XadPT**: the Xbox port. Hardware testing and bug reports on a real console,
+  feature requests and direction.
+- **[nxdk](https://github.com/XboxDev/nxdk)** (XboxDev) and its **pbgl**
+  OpenGL layer: the toolchain and graphics backend.
+- Code written with Claude Code (Anthropic), working from XadPT's test results.
