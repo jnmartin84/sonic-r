@@ -67,13 +67,18 @@ static int xb_exists(const char *path)
     return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
 }
 
-static void xb_write_if_missing(const char *path, const void *data, size_t len)
+static void xb_write_always(const char *path, const void *data, size_t len)
 {
-    if (xb_exists(path)) return;
     FILE *f = fopen(path, "wb");
     if (!f) return;
     fwrite(data, 1, len, f);
     fclose(f);
+}
+
+static void xb_write_if_missing(const char *path, const void *data, size_t len)
+{
+    if (xb_exists(path)) return;
+    xb_write_always(path, data, len);
 }
 
 /* UTF-16LE text file with BOM, as the dashboard expects for *.xbx metadata. */
@@ -111,7 +116,7 @@ static void xb_make_save_folder(const char *id, const char *name)
     snprintf(p, sizeof(p), "%s\\%s\\SaveMeta.xbx", s_ud, id);
     xb_write_meta(p, meta);
     snprintf(p, sizeof(p), "%s\\%s\\saveimage.xbx", s_ud, id);
-    xb_write_if_missing(p, xb_saveimage_xbx, sizeof(xb_saveimage_xbx));
+    xb_write_always(p, xb_saveimage_xbx, sizeof(xb_saveimage_xbx));
 }
 
 /* TitleMeta.xbx is UTF-16LE; true if it already names this game. */
@@ -165,7 +170,7 @@ static void xb_udata_init(void)
     snprintf(p, sizeof(p), "%s\\TitleMeta.xbx", s_ud);
     xb_write_meta(p, "TitleName=Sonic R\r\n");
     snprintf(p, sizeof(p), "%s\\TitleImage.xbx", s_ud);
-    xb_write_if_missing(p, xb_titleimage_xbx, sizeof(xb_titleimage_xbx));
+    xb_write_always(p, xb_titleimage_xbx, sizeof(xb_titleimage_xbx));
 
     xb_make_save_folder(UD_SAVES, "Sonic R Race Saves");
     xb_make_save_folder(UD_SETTINGS, "Sonic R Settings");
@@ -288,6 +293,30 @@ static void xbox_install_exception_handler(void)
     __asm__ __volatile__("movl %0, %%fs:0" : : "r"(&s_excReg));
 }
 
+/* Put the AC97 controller back to an idle state before the reboot: stop and
+ * reset both bus-master channels (analog + S/PDIF), mask/clear their
+ * interrupts and drop the descriptor-list pointers, so no DMA/IRQ is left
+ * pointing at memory that is about to disappear. */
+static void xb_ac97_shutdown(void)
+{
+    volatile unsigned char *pb = (volatile unsigned char *)0xfec00000;
+    volatile unsigned int *pw = (volatile unsigned int *)0xfec00000;
+    const int crOff[2] = { 0x11B, 0x17B };   /* control registers */
+    const int srOff[2] = { 0x116, 0x176 };   /* status registers */
+    const int bdOff[2] = { 0x110, 0x170 };   /* descriptor list base addresses */
+    for (int i = 0; i < 2; i++) {
+        volatile unsigned char *cr = pb + crOff[i];
+        *cr = 0;                                  /* stop, no interrupts */
+        for (int t = 0; t < 100000 && (*cr & 1); t++) { }
+        *cr = 2;                                  /* reset the channel registers */
+        for (int t = 0; t < 100000 && (*cr & 2); t++) { }
+        *cr = 0;
+        pb[srOff[i]] = 0xFF;                      /* clear pending status */
+        pw[bdOff[i] >> 2] = 0;                    /* forget the descriptor list */
+    }
+    fprintf(stderr, "exit: audio hardware idle\n");
+}
+
 int main(void)
 {
     static char *argv[] = { "SONICR.XBE", 0 };
@@ -307,6 +336,7 @@ int main(void)
     fprintf(stderr, "exit: returning to dashboard\n");
     fflush(stderr);
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    xb_ac97_shutdown();
     SDL_Delay(200);
     /* A full reboot lands on the dashboard on every setup; XLaunchXBE(NULL)
      * (quick reboot) left a black screen on this console. */

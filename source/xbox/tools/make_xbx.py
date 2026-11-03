@@ -53,7 +53,7 @@ def dxt1(img):
 def xpr(size):
     data = dxt1(render(size))
     lg = size.bit_length() - 1
-    fmt = 0x02 | (2 << 4) | (0x0C << 8) | (1 << 16) | (lg << 20) | (lg << 24)
+    fmt = 0x01 | 0x08 | (2 << 4) | (0x0C << 8) | (1 << 16) | (lg << 20) | (lg << 24)
     hdr_size = 0x800
     total = hdr_size + len(data)
     hdr = struct.pack("<4sIIIIIIII", b"XPR0", total, hdr_size,
