@@ -446,6 +446,8 @@ static const int s_optPageItems[7][2] = {
  * ROM table at 0x50286C: 8-byte stride {firstItem, lastItem} per page.
  * Computes item count, scroll range, and centering offset.
  * ===================================================================== */
+static int IsDisabledGraphicsItem(int itemIndex);
+
 void InitOptionsMenuPage(int pageIndex, int basePos)  /* EAX, EDX */
 {
     g_optCurrentPage = pageIndex;
@@ -456,6 +458,10 @@ void InitOptionsMenuPage(int pageIndex, int basePos)  /* EAX, EDX */
     int length = s_optPageItems[pageIndex][1];
 
     g_optMenuCursor = basePos + start;
+    /* Land on the first selectable row (Graphics opens with blank rows). */
+    while (g_optMenuCursor < length && IsDisabledGraphicsItem(g_optMenuCursor)) {
+        g_optMenuCursor++;
+    }
     g_optMenuMaxItem = length;
 
     int diff = length - start;                              /* eax after sub */
@@ -495,6 +501,12 @@ static void OptionsMenuScrollUp(void)
 
         /* Item 3: skip if no CD AND no sound system */
         if (cursor == 3 && cdFlag == 0 && soundFlag == 0) {
+            skip = 1;
+        }
+
+        /* Blanked Graphics rows are not selectable (the callers undo the move
+         * when nothing selectable lies in that direction). */
+        if (IsDisabledGraphicsItem(cursor)) {
             skip = 1;
         }
 
@@ -558,6 +570,12 @@ static void OptionsMenuScrollDown(void)
 
         /* Item 3: skip if no CD AND no sound system */
         if (cursor == 3 && cdFlag == 0 && soundFlag == 0) {
+            skip = 1;
+        }
+
+        /* Blanked Graphics rows are not selectable (the callers undo the move
+         * when nothing selectable lies in that direction). */
+        if (IsDisabledGraphicsItem(cursor)) {
             skip = 1;
         }
 
@@ -1274,12 +1292,20 @@ int OptionsMenuScreen(void)
             if ((g_inputBits & 0x10) && !(g_inputBits & 0x20)) {  /* up pressed, not down */
                 if (g_optMenuScrollTgt == g_optMenuScrollCur) {
                     if (g_optMenuCursor > g_optMenuSelected) {
+                        int oldCur = g_optMenuCursor, oldTgt = g_optMenuScrollTgt;
                         g_optMenuCursor--;
                         g_optMenuScrollTgt -= 0x14;
                         OptionsMenuScrollUp();
-
-                        PlaySoundEffect(1, 0, 0);
-                        lastTime = timeGetTime() / 1000;
+                        if (g_optMenuCursor < g_optMenuSelected ||
+                            IsDisabledGraphicsItem(g_optMenuCursor)) {
+                            /* nothing selectable above — stay put */
+                            g_optMenuCursor = oldCur;
+                            g_optMenuScrollTgt = oldTgt;
+                        }
+                        else {
+                            PlaySoundEffect(1, 0, 0);
+                            lastTime = timeGetTime() / 1000;
+                        }
                     }
                 }
             }
@@ -1288,12 +1314,19 @@ int OptionsMenuScreen(void)
             else if ((g_inputBits & 0x20) && !(g_inputBits & 0x10)) {
                 if (g_optMenuScrollTgt == g_optMenuScrollCur) {
                     if (g_optMenuCursor < g_optMenuMaxItem) {
+                        int oldCur = g_optMenuCursor, oldTgt = g_optMenuScrollTgt;
                         g_optMenuCursor++;
                         g_optMenuScrollTgt += 0x14;
                         OptionsMenuScrollDown();
-
-                        PlaySoundEffect(1, 0, 0);
-                        lastTime = timeGetTime() / 1000;
+                        if (g_optMenuCursor > g_optMenuMaxItem ||
+                            IsDisabledGraphicsItem(g_optMenuCursor)) {
+                            g_optMenuCursor = oldCur;
+                            g_optMenuScrollTgt = oldTgt;
+                        }
+                        else {
+                            PlaySoundEffect(1, 0, 0);
+                            lastTime = timeGetTime() / 1000;
+                        }
                     }
                 }
             }
