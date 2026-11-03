@@ -525,19 +525,63 @@ void R_DrawTriFan(const RenderVertex *v, int count)
         }
     }
     if (count <= 16) {
-        float buf[16 * 10];
+        /* Polygons with huge screen coordinates (vertices near the camera plane)
+         * are clipped to a rectangle just outside the screen in software: the
+         * NV2A mis-rasterises such triangles (dropped/black polygons). Attributes
+         * that are linear in screen space (rhw, u*rhw, v*rhw, colour, z) are
+         * interpolated. */
+        typedef struct { float x, y, z, q, uq, vq, r, g, b, a; } CV;
+        CV in[24], out[24];
+        int n = count, bad = 0;
         for (int i = 0; i < count; i++) {
             uint32_t argb = v[i].color;
-            float w = (v[i].rhw > 0.0f) ? (1.0f / v[i].rhw) : 1.0f;
-            float *o = &buf[i * 10];
-            o[0] = v[i].sx * w;  o[1] = v[i].sy * w;  o[2] = v[i].sz * w;  o[3] = w;
-            o[4] = (float)((argb >> 16) & 0xFF) / 255.0f;
-            o[5] = (float)((argb >>  8) & 0xFF) / 255.0f;
-            o[6] = (float)((argb      ) & 0xFF) / 255.0f;
-            o[7] = (float)((argb >> 24) & 0xFF) / 255.0f;
-            o[8] = v[i].u;  o[9] = v[i].v;
+            float q = (v[i].rhw > 0.0f) ? v[i].rhw : 1.0f;
+            in[i].x = v[i].sx; in[i].y = v[i].sy; in[i].z = v[i].sz; in[i].q = q;
+            in[i].uq = v[i].u * q; in[i].vq = v[i].v * q;
+            in[i].r = (float)((argb >> 16) & 0xFF) / 255.0f;
+            in[i].g = (float)((argb >>  8) & 0xFF) / 255.0f;
+            in[i].b = (float)((argb      ) & 0xFF) / 255.0f;
+            in[i].a = (float)((argb >> 24) & 0xFF) / 255.0f;
+            if (v[i].sx < -256.0f || v[i].sx > 896.0f || v[i].sy < -256.0f || v[i].sy > 736.0f) bad = 1;
         }
-        xb_draw_fan(buf, count);
+        if (bad) {
+            for (int e = 0; e < 4 && n >= 3; e++) {
+                int m = 0;
+                for (int i = 0; i < n; i++) {
+                    CV *a = &in[i], *b = &in[(i + 1) % n];
+                    float da, db;
+                    switch (e) {
+                    case 0:  da = a->x + 256.0f; db = b->x + 256.0f; break;
+                    case 1:  da = 896.0f - a->x; db = 896.0f - b->x; break;
+                    case 2:  da = a->y + 256.0f; db = b->y + 256.0f; break;
+                    default: da = 736.0f - a->y; db = 736.0f - b->y; break;
+                    }
+                    if (da >= 0.0f) out[m++] = *a;
+                    if ((da >= 0.0f) != (db >= 0.0f)) {
+                        float t = da / (da - db);
+                        CV *o = &out[m++];
+                        o->x  = a->x  + (b->x  - a->x)  * t;  o->y  = a->y  + (b->y  - a->y)  * t;
+                        o->z  = a->z  + (b->z  - a->z)  * t;  o->q  = a->q  + (b->q  - a->q)  * t;
+                        o->uq = a->uq + (b->uq - a->uq) * t;  o->vq = a->vq + (b->vq - a->vq) * t;
+                        o->r  = a->r  + (b->r  - a->r)  * t;  o->g  = a->g  + (b->g  - a->g)  * t;
+                        o->b  = a->b  + (b->b  - a->b)  * t;  o->a  = a->a  + (b->a  - a->a)  * t;
+                    }
+                    if (m >= 22) break;
+                }
+                for (int i = 0; i < m; i++) in[i] = out[i];
+                n = m;
+            }
+            if (n < 3) return;
+        }
+        float buf[24 * 10];
+        for (int i = 0; i < n; i++) {
+            float w = (in[i].q > 0.0f) ? (1.0f / in[i].q) : 1.0f;
+            float *o = &buf[i * 10];
+            o[0] = in[i].x * w;  o[1] = in[i].y * w;  o[2] = in[i].z * w;  o[3] = w;
+            o[4] = in[i].r; o[5] = in[i].g; o[6] = in[i].b; o[7] = in[i].a;
+            o[8] = in[i].uq * w;  o[9] = in[i].vq * w;
+        }
+        xb_draw_fan(buf, n);
         return;
     }
     XB_BEND();
