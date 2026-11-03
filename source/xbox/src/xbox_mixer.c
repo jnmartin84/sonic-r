@@ -147,30 +147,76 @@ static void mix_chunk_channel(int idx, Uint8 *out, int len)
     SDL_MixAudioFormat(out, buf, AUDIO_S16LSB, (Uint32)len, c->volume);
 }
 
+/* Music is decoded/read by a producer thread into a ring buffer so that disk
+ * reads and ADX decoding never run inside the audio callback (which used to
+ * underrun whenever the HDD or CPU was busy -> glitchy music). */
+#define MUS_RING (512 * 1024)
+static Uint8            s_ring[MUS_RING];
+static volatile Uint32  s_rHead, s_rTail;     /* monotonic byte counters */
+static volatile int     s_rEof;               /* producer finished (no more loops) */
+static SDL_mutex       *s_musMutex;
+static SDL_Thread      *s_musThread;
+static volatile int     s_musQuit;
+
+static int music_producer(void *arg)
+{
+    static Uint8 tmp[16384];
+    (void)arg;
+    while (!s_musQuit) {
+        int did = 0;
+        SDL_LockMutex(s_musMutex);
+        if (s_musicPlaying && s_music && !s_rEof &&
+            (MUS_RING - (s_rHead - s_rTail)) >= sizeof(tmp)) {
+            size_t got = SDL_RWread(s_music->rw, tmp, 1, sizeof(tmp));
+            if (got == 0) {
+                if (s_musicLoops == -1 || s_musicLoops > 0) {
+                    if (s_musicLoops > 0) {
+                        s_musicLoops--;
+                    }
+                    SDL_RWseek(s_music->rw, s_music->dataStart, RW_SEEK_SET);
+                }
+                else {
+                    s_rEof = 1;
+                }
+            }
+            else {
+                Uint32 h = s_rHead;
+                for (size_t i = 0; i < got; i++) {
+                    s_ring[(h + (Uint32)i) % MUS_RING] = tmp[i];
+                }
+                s_rHead = h + (Uint32)got;
+            }
+            did = 1;
+        }
+        SDL_UnlockMutex(s_musMutex);
+        if (!did) {
+            SDL_Delay(8);
+        }
+        else {
+            SDL_Delay(1);   /* let the main thread breathe between 16 KB reads */
+        }
+    }
+    return 0;
+}
+
 static void mix_music(Uint8 *out, int len)
 {
     static Uint8 tmp[16384];
     if (len > (int)sizeof(tmp)) {
         len = (int)sizeof(tmp);
     }
-    int filled = 0;
-    while (filled < len && s_musicPlaying) {
-        size_t got = SDL_RWread(s_music->rw, tmp + filled, 1, (size_t)(len - filled));
-        if (got == 0) {
-            if (s_musicLoops == -1 || s_musicLoops > 0) {
-                if (s_musicLoops > 0) {
-                    s_musicLoops--;
-                }
-                SDL_RWseek(s_music->rw, s_music->dataStart, RW_SEEK_SET);
-                continue;
-            }
-            s_musicPlaying = 0;
-            break;
-        }
-        filled += (int)got;
+    Uint32 avail = s_rHead - s_rTail;
+    int n = (Uint32)len < avail ? len : (int)avail;
+    Uint32 t = s_rTail;
+    for (int i = 0; i < n; i++) {
+        tmp[i] = s_ring[(t + (Uint32)i) % MUS_RING];
     }
-    if (filled > 0) {
-        SDL_MixAudioFormat(out, tmp, AUDIO_S16LSB, (Uint32)filled, s_musicVolume);
+    s_rTail = t + (Uint32)n;
+    if (n > 0) {
+        SDL_MixAudioFormat(out, tmp, AUDIO_S16LSB, (Uint32)n, s_musicVolume);
+    }
+    if (n < len && s_rEof && s_rHead == s_rTail) {
+        s_musicPlaying = 0;
     }
 }
 
@@ -214,12 +260,24 @@ int Mix_OpenAudio(int frequency, Uint16 format, int channels, int chunksize)
         set_err(SDL_GetError());
         return -1;
     }
+    if (!s_musMutex) {
+        s_musMutex = SDL_CreateMutex();
+    }
+    if (!s_musThread && s_musMutex) {
+        s_musQuit = 0;
+        s_musThread = SDL_CreateThread(music_producer, "music", NULL);
+    }
     SDL_PauseAudioDevice(s_dev, 0);
     return 0;
 }
 
 void Mix_CloseAudio(void)
 {
+    if (s_musThread) {
+        s_musQuit = 1;
+        SDL_WaitThread(s_musThread, NULL);
+        s_musThread = NULL;
+    }
     if (s_dev) {
         SDL_CloseAudioDevice(s_dev);
         s_dev = 0;
@@ -476,12 +534,16 @@ void Mix_FreeMusic(Mix_Music *music)
     if (!music) {
         return;
     }
+    SDL_LockMutex(s_musMutex);
     SDL_LockAudioDevice(s_dev);
     if (s_music == music) {
         s_musicPlaying = 0;
         s_music = NULL;
+        s_rHead = s_rTail = 0;
+        s_rEof = 0;
     }
     SDL_UnlockAudioDevice(s_dev);
+    SDL_UnlockMutex(s_musMutex);
     if (music->ownsRw) {
         SDL_RWclose(music->rw);
     }
@@ -493,20 +555,28 @@ int Mix_PlayMusic(Mix_Music *music, int loops)
     if (!music) {
         return -1;
     }
+    SDL_LockMutex(s_musMutex);
     SDL_LockAudioDevice(s_dev);
     s_music = music;
     s_musicLoops = loops;
     SDL_RWseek(music->rw, music->dataStart, RW_SEEK_SET);
+    s_rHead = s_rTail = 0;
+    s_rEof = 0;
     s_musicPlaying = 1;
     SDL_UnlockAudioDevice(s_dev);
+    SDL_UnlockMutex(s_musMutex);
     return 0;
 }
 
 int Mix_HaltMusic(void)
 {
+    SDL_LockMutex(s_musMutex);
     SDL_LockAudioDevice(s_dev);
     s_musicPlaying = 0;
+    s_rHead = s_rTail = 0;
+    s_rEof = 0;
     SDL_UnlockAudioDevice(s_dev);
+    SDL_UnlockMutex(s_musMutex);
     return 0;
 }
 
