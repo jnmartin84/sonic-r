@@ -1238,7 +1238,13 @@ void RenderWavingMenuBackground(void)
     s_waveCur = 1;
     if (s_waveDone) return;
     if (first) return;   /* first frame of a menu: next frame draws it behind the sprites */
+    /* Screens that call this first (e.g. the Chaos Emerald screen) must not let
+     * the wallpaper write depth, or the sprites drawn afterwards fail the test. */
+    R_PushState();
+    R_SetDepthTest(0);
+    R_SetDepthWrite(0);
     WavingDraw();
+    R_PopState();
 }
 #else
 void RenderWavingMenuBackground(void) { WavingDraw(); }
