@@ -574,6 +574,24 @@ void R_DrawTriFan(const RenderVertex *v, int count)
             if (n < 3) return;
         }
         float buf[24 * 10];
+        if (!bad) {
+            /* Common case: pass the original values through untouched (the
+             * u*q/q round trip is not bit-exact and showed up as stray dots
+             * at sprite edges). */
+            for (int i = 0; i < count; i++) {
+                uint32_t argb = v[i].color;
+                float w = (v[i].rhw > 0.0f) ? (1.0f / v[i].rhw) : 1.0f;
+                float *o = &buf[i * 10];
+                o[0] = v[i].sx * w;  o[1] = v[i].sy * w;  o[2] = v[i].sz * w;  o[3] = w;
+                o[4] = (float)((argb >> 16) & 0xFF) / 255.0f;
+                o[5] = (float)((argb >>  8) & 0xFF) / 255.0f;
+                o[6] = (float)((argb      ) & 0xFF) / 255.0f;
+                o[7] = (float)((argb >> 24) & 0xFF) / 255.0f;
+                o[8] = v[i].u;  o[9] = v[i].v;
+            }
+            xb_draw_fan(buf, count);
+            return;
+        }
         for (int i = 0; i < n; i++) {
             float w = (in[i].q > 0.0f) ? (1.0f / in[i].q) : 1.0f;
             float *o = &buf[i * 10];
