@@ -133,18 +133,19 @@ void GL_InitTextures(void)
  * Tpage pixel data is 16bpp (RGB565).
  * Standard tpages are 256x256. Wallpaper tpages may be 640x480.
  */
+#ifdef SONICR_XBOX
+extern void xb_tex_image_rgba(int w, int h, const void *rgba);
+#define XB_TEXIMAGE_RGBA(w, h, p) xb_tex_image_rgba((w), (h), (p))
+#else
+#define XB_TEXIMAGE_RGBA(w, h, p) \
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (w), (h), 0, GL_RGBA, GL_UNSIGNED_BYTE, (p))
+#endif
+
 static void GL_UploadTpageImpl(int tpage)
 {
     if (!s_glTexturesInited) {
         GL_InitTextures();
     }
-#ifdef SONICR_XBOX
-    {
-        static int s_uploads;
-        if (s_uploads++ < 40)
-            fprintf(stderr, "upload tpage %d\n", tpage);
-    }
-#endif
 
     unsigned short *pixels = (unsigned short *)g_tpagePixelBuf[tpage];
     if (pixels == NULL) {
@@ -171,17 +172,15 @@ static void GL_UploadTpageImpl(int tpage)
     /* Persistent full-quality RGBA8 override (32-bit sky) — preferred over the
      * 16bpp buffer and re-uploaded on every dirty, so it never reverts. */
     if (s_tpageRGBA8Buf[tpage]) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
-                     GL_RGBA, GL_UNSIGNED_BYTE, s_tpageRGBA8Buf[tpage]);
+        XB_TEXIMAGE_RGBA(w, h, s_tpageRGBA8Buf[tpage]);
         s_glTextureDirty[tpage] = 0;
         return;
     }
 
     /* Check for pending full-quality RGBA data (from TintBackgroundTPage) */
     if (s_pendingRGBA[tpage]) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                     s_pendingRGBAWidth[tpage], s_pendingRGBAHeight[tpage], 0,
-                     GL_RGBA, GL_UNSIGNED_BYTE, s_pendingRGBA[tpage]);
+        XB_TEXIMAGE_RGBA(s_pendingRGBAWidth[tpage], s_pendingRGBAHeight[tpage],
+                         s_pendingRGBA[tpage]);
         free(s_pendingRGBA[tpage]);
         s_pendingRGBA[tpage] = NULL;
         s_glTextureDirty[tpage] = 0;
@@ -228,23 +227,7 @@ static void GL_UploadTpageImpl(int tpage)
             out8[i * 4 + 3] = a;
         }
     }
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, out8);
-#ifdef SONICR_XBOX
-    {
-        /* Content statistics of what was just uploaded (debugging blank menus). */
-        static int s_stat;
-        if (s_stat++ < 150) {
-            unsigned long sr = 0, sg = 0, sb = 0; int a0 = 0;
-            for (int i = 0; i < count; i++) {
-                sr += out8[i*4]; sg += out8[i*4+1]; sb += out8[i*4+2];
-                if (out8[i*4+3] == 0) a0++;
-            }
-            fprintf(stderr, "  tex %d %dx%d: transparent=%d/%d avgRGB=%lu,%lu,%lu nokey=%d\n", tpage, w, h,
-                    a0, count, sr / count, sg / count, sb / count, s_tpageNoColorKey[tpage]);
-        }
-    }
-#endif
+    XB_TEXIMAGE_RGBA(w, h, out8);
 #else
     uint16_t *out = s_rgba4Storage;
     if (s_tpageNoColorKey[tpage]) {
@@ -333,8 +316,7 @@ static void GL_UploadTpageRGBAImpl(int tpage, unsigned char *rgba, int w, int h)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+    XB_TEXIMAGE_RGBA(w, h, rgba);
     s_glTextureDirty[tpage] = 0;
 }
 

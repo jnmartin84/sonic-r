@@ -72,3 +72,44 @@ void xb_draw_fan(const float *verts, int n)
     p = push_command_parameter(p, NV097_SET_BEGIN_END, NV097_SET_BEGIN_END_OP_END);
     s_p = p;
 }
+
+/*
+ * Fast RGBA8 texture upload.
+ *
+ * pbgl's glTexImage2D swizzles one pixel at a time, rebuilding the swizzled
+ * offset bit by bit and calling memcpy per pixel. Here pbgl only allocates the
+ * texture (data = NULL) and the pixels are written straight into its swizzled
+ * storage with the usual incremental-mask walk. Same memory layout as pbgl's
+ * own path (RGBA -> RGBA needs no conversion there either).
+ */
+#include "swizzle.h"
+
+void xb_tex_image_rgba(int w, int h, const void *rgba)
+{
+    xb_batch_end();
+    if (w <= 0 || h <= 0 || (w & (w - 1)) || (h & (h - 1)) || rgba == NULL) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+        return;
+    }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    texture_t *tex = pbgl.tex[pbgl.active_tex_sv].tex;
+    if (!tex || !tex->allocated || tex->bytespp != 4 || tex->gl.gen_mipmap ||
+        tex->mips[0].data == NULL ||
+        tex->mips[0].width != (GLuint)w || tex->mips[0].height != (GLuint)h) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+        return;
+    }
+    uint32_t mx, my, mz;
+    swizzle_generate_masks((unsigned)w, (unsigned)h, 1, &mx, &my, &mz);
+    uint32_t *dst = (uint32_t *)tex->mips[0].data;
+    const uint32_t *src = (const uint32_t *)rgba;
+    uint32_t yo = 0;
+    for (int y = 0; y < h; y++) {
+        uint32_t xo = 0;
+        for (int x = 0; x < w; x++) {
+            dst[xo | yo] = *src++;
+            xo = (xo - mx) & mx;
+        }
+        yo = (yo - my) & my;
+    }
+}

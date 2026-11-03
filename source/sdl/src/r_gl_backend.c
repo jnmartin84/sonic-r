@@ -531,10 +531,12 @@ void R_DrawTriFan(const RenderVertex *v, int count)
             float w = (v[i].rhw > 0.0f) ? (1.0f / v[i].rhw) : 1.0f;
             float *o = &buf[i * 10];
             o[0] = v[i].sx * w;  o[1] = v[i].sy * w;  o[2] = v[i].sz * w;  o[3] = w;
-            o[4] = (float)((argb >> 16) & 0xFF) / 255.0f;
-            o[5] = (float)((argb >>  8) & 0xFF) / 255.0f;
-            o[6] = (float)((argb      ) & 0xFF) / 255.0f;
-            o[7] = (float)((argb >> 24) & 0xFF) / 255.0f;
+            /* multiply, not divide: four FDIVs per vertex added up */
+            const float k = 1.0f / 255.0f;
+            o[4] = (float)((argb >> 16) & 0xFF) * k;
+            o[5] = (float)((argb >>  8) & 0xFF) * k;
+            o[6] = (float)((argb      ) & 0xFF) * k;
+            o[7] = (float)((argb >> 24) & 0xFF) * k;
             o[8] = v[i].u;  o[9] = v[i].v;
         }
         xb_draw_fan(buf, count);

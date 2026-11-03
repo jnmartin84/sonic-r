@@ -282,6 +282,7 @@ static EXCEPTION_DISPOSITION __cdecl xbox_exc_handler(EXCEPTION_RECORD *rec, voi
             }
         }
     }
+    fflush(stderr);
     return ExceptionContinueSearch;
 }
 
@@ -335,10 +336,13 @@ static void xb_exit_cleanup(void)
 int main(void)
 {
     static char *argv[] = { "SONICR.XBE", 0 };
-    /* The Xbox has no console: send stderr to D:\SONICR.LOG, unbuffered so the
-     * last lines survive a crash. If D: is read-only this is silently skipped. */
+    /* The Xbox has no console: send stderr to D:\SONICR.LOG. Fully buffered:
+     * every unbuffered write to the HDD stalled the game for a frame or more.
+     * The buffer is flushed at natural pauses (slow/loading frames), by the
+     * watchdog, the exception handler and on exit. If D: is read-only this is
+     * silently skipped. */
     if (freopen("D:\\SONICR.LOG", "w", stderr)) {
-        setvbuf(stderr, NULL, _IONBF, 0);
+        setvbuf(stderr, NULL, _IOFBF, 64 * 1024);
         fprintf(stderr, "Sonic R Xbox: started\n");
     }
     xb_udata_init();

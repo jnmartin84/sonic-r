@@ -30,7 +30,14 @@ SRCS := $(shell find $(SDL_SRC) -name '*.c' ! \( $(EXCLUDE) \)) \
         $(XBOX_DIR)/src/xbox_mixer.c \
         $(XBOX_DIR)/src/xbox_net_stub.c \
         $(XBOX_DIR)/src/xbox_entry.c \
-        $(XBOX_DIR)/src/xbox_fastdraw.c
+        $(XBOX_DIR)/src/xbox_fastdraw.c \
+        $(XBOX_DIR)/src/xbox_fastmem.c
+
+# nxdk compiles its libraries (pdclib, pbkit, pbgl, SDL2, ...) with whatever
+# CFLAGS the project passes, and with no -O at all that means clang's -O0.
+# Optimise everything; the game objects add their own flags below.
+CFLAGS   += -O2
+CXXFLAGS += -O2
 
 include $(NXDK_DIR)/Makefile
 $(XBOX_DIR)/src/xbox_fastdraw.obj: CFLAGS += -I$(NXDK_DIR)/lib/pbgl/src
@@ -40,11 +47,14 @@ include $(NXDK_DIR)/lib/pbgl/Makefile
 # These flags are scoped to the game's own objects: the force-included compat
 # header drops _WIN32, which would break nxdk's own SDL/libc sources.
 GAME_OBJS := $(addsuffix .obj,$(basename $(SRCS)))
-$(GAME_OBJS): CFLAGS += -std=gnu11 -O2 -fno-common -w \
+$(GAME_OBJS): CFLAGS += -std=gnu11 -O2 -fbuiltin -fno-math-errno -fno-common -w \
           -I$(SDL_SRC) -I$(XBOX_DIR)/include \
           -DSONICR_SDL -DSONICR_XBOX -DSONICR_DEBUG_LOG -DSDL_MAIN_HANDLED \
           -DDATA_DIR=\"D:\" \
           -include $(XBOX_DIR)/include/xbox_compat.h
+
+# Must not let the compiler turn anything in here back into memcpy/memset calls.
+$(XBOX_DIR)/src/xbox_fastmem.obj: CFLAGS += -fno-builtin
 
 # The game's main() is called from src/xbox_entry.c with a fixed argv, because
 # nxdk does not pass command-line arguments.

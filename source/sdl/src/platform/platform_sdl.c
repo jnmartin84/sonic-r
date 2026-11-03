@@ -932,6 +932,7 @@ static int xb_watchdog(void *arg)
             if (stalled == 4 || (stalled > 4 && stalled % 10 == 0))
                 fprintf(stderr, "WATCHDOG: no frame for %d s, last mark: %s\n", stalled,
                         (const char *)g_lastMark);
+            if (stalled == 4 || (stalled > 4 && stalled % 10 == 0)) fflush(stderr);
         } else {
             stalled = 0;
             last = g_xbFrames;
@@ -952,12 +953,18 @@ static int s_xbLogLen;
 static void xb_log_flush(void)
 {
     if (s_xbLogLen) { s_xbLog[s_xbLogLen] = 0; fputs(s_xbLog, stderr); s_xbLogLen = 0; }
+    fflush(stderr);   /* stderr is fully buffered on Xbox: this is the write point */
+}
+/* Move the line buffer into stdio's (RAM) buffer without touching the disk. */
+static void xb_log_spill(void)
+{
+    if (s_xbLogLen) { s_xbLog[s_xbLogLen] = 0; fputs(s_xbLog, stderr); s_xbLogLen = 0; }
 }
 static void xb_logf(const char *fmt, ...)
 {
     va_list ap;
     int n;
-    if (s_xbLogLen > (int)sizeof(s_xbLog) - 600) xb_log_flush();
+    if (s_xbLogLen > (int)sizeof(s_xbLog) - 600) xb_log_spill();
     va_start(ap, fmt);
     n = vsnprintf(s_xbLog + s_xbLogLen, sizeof(s_xbLog) - 1 - s_xbLogLen, fmt, ap);
     va_end(ap);
