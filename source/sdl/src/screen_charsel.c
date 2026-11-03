@@ -743,7 +743,13 @@ int CharacterSelectScreen(void)
          * binary uses. */
         for (int ci = 1; ci < 9; ci++) {
             int iconUvX, iconUvY;
+#ifdef SONICR_XBOX
+            /* Eggman (ci 4) is locked like the other secrets: silhouette + red X
+             * instead of his portrait under the cyan X. */
+            if (g_charUnlockTable[ci] == 0 || (ci == 4 && g_charUnlockTable[ci] != 2)) {
+#else
             if (g_charUnlockTable[ci] == 0) {            /* 0x48d85e */
+#endif
                 /* Never-seen: grey silhouette from the 0xE4 column.
                  *
                  * The binary does NOT index g_charIconUV here (0x48d866 path).
@@ -761,6 +767,9 @@ int CharacterSelectScreen(void)
                  * the far-right slot. */
                 iconUvX = 0xE4;                          /* 0x48d86f */
                 iconUvY = 0x28 * ci - 0xC8;              /* 0x48d791 + 0x48d840 */
+#ifdef SONICR_XBOX
+                if (ci == 4) iconUvY = 0;                /* no silhouette of his own: use the first */
+#endif
             }
             else {
                 iconUvX = g_charIconUV[ci * 2];          /* 0x48d7ae */
@@ -788,8 +797,12 @@ int CharacterSelectScreen(void)
              * There is a third copy of the red X at (0xE4, 0xC8) on a green
              * colour-key background. Nothing in the binary reads it. */
             if (g_charUnlockTable[ci] != 2) {
+                #ifdef SONICR_XBOX
+                int xUvX = 0xE4, xUvY = 0xA0;            /* red X for everyone */
+#else
                 int xUvX = (ci == 4) ? 0xC8 : 0xE4;      /* 0x48d7e4 / 0x48d7f2 */
                 int xUvY = (ci == 4) ? 0xC8 : 0xA0;
+#endif
                 R_PushState();
                 R_SetBlendMode(R_BLEND_ADDITIVE);
                 DrawTexturedQuad(charPos, 0x168, 0x433E0000, 0x38, 0x50,
