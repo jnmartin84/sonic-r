@@ -38,7 +38,7 @@ include $(NXDK_DIR)/lib/pbgl/Makefile
 # These flags are scoped to the game's own objects: the force-included compat
 # header drops _WIN32, which would break nxdk's own SDL/libc sources.
 GAME_OBJS := $(addsuffix .obj,$(basename $(SRCS)))
-$(GAME_OBJS): CFLAGS += -std=gnu11 -Os -fno-common -w \
+$(GAME_OBJS): CFLAGS += -std=gnu11 -O2 -fno-common -w \
           -I$(SDL_SRC) -I$(XBOX_DIR)/include \
           -DSONICR_SDL -DSONICR_XBOX -DSONICR_DEBUG_LOG -DSDL_MAIN_HANDLED \
           -DDATA_DIR=\"D:\" \

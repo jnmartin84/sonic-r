@@ -917,6 +917,7 @@ void platform_audio_shutdown(void)
 #ifdef SONICR_XBOX
 volatile const char *g_lastMark = "start";
 volatile int g_xbFrames;
+unsigned g_dbgTLoop, g_dbgTHud, g_dbgLogicMs, g_dbgRenderMs;
 static unsigned *g_dbgSwapAcc;
 extern int g_dbgMode;
 static int xb_watchdog(void *arg)
@@ -996,6 +997,16 @@ void platform_gl_swap(void)
                 fprintf(stderr, "timing: %u frames in %u ms (avg %u.%u ms), >50ms:%u >80ms:%u >120ms:%u max:%u ms, swap-wait avg %u us\n",
                         s_cnt, span, s_cnt ? span / s_cnt : 0, s_cnt ? (span * 10 / s_cnt) % 10 : 0,
                         s_n50, s_n80, s_n120, s_max, s_cnt ? s_swapMs * 1000u / s_cnt : 0);
+                {
+                    extern int g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs, g_dbgBigQuads, g_dbgDraws[53];
+                    unsigned nd = 0;
+                    for (int t = 0; t < 53; t++) nd += (unsigned)g_dbgDraws[t];
+                    fprintf(stderr, "timing2: logic %u ms, render %u ms (race frames, sum); uploads %d (%d ms, max %d ms); draws/frame %u; big-quads %d\n",
+                            g_dbgLogicMs, g_dbgRenderMs, g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs,
+                            nd / 600u, g_dbgBigQuads);
+                    g_dbgUploadCount = g_dbgUploadMs = g_dbgUploadMaxMs = g_dbgBigQuads = 0;
+                    g_dbgLogicMs = g_dbgRenderMs = 0;
+                }
                 s_t0 = nowT; s_n50 = s_n80 = s_n120 = s_max = s_swapMs = s_cnt = 0;
                 (void)s_logMs;
             }

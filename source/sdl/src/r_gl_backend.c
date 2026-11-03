@@ -489,6 +489,7 @@ static inline void R_EmitVertex(const RenderVertex *v)
 /* Per-tpage draw statistics for on-hardware debugging (see platform_gl_swap). */
 int   g_dbgMode;     /* Back button cycles 0..4 for on-hardware experiments */
 int   g_dbgDraws[53];
+int   g_dbgBigQuads;   /* draws with a vertex far outside the screen */
 float g_dbgVert[53][6];
 #endif
 void R_DrawTriFan(const RenderVertex *v, int count)
@@ -508,6 +509,12 @@ void R_DrawTriFan(const RenderVertex *v, int count)
 
     R_FlushState();
 #ifdef SONICR_XBOX
+    for (int i = 0; i < count; i++) {
+        if (v[i].sx < -2000.0f || v[i].sx > 2640.0f || v[i].sy < -2000.0f || v[i].sy > 2480.0f) {
+            g_dbgBigQuads++;
+            break;
+        }
+    }
     if (g_dbgMode >= 1 && g_dbgMode <= 3) {
         /* strip everything that could hide a quad */
         glDisable(GL_DEPTH_TEST);  s_current.depthTest = -1;

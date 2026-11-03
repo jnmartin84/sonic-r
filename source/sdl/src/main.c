@@ -1344,6 +1344,9 @@ race_start:
 #define RACE_MARK(s) ((void)0)
 #endif
         RACE_MARK("loop top");
+#ifdef SONICR_XBOX
+        { extern unsigned g_dbgTLoop; g_dbgTLoop = (unsigned)SDL_GetTicks(); }
+#endif
         /* PeekMessageA — SDL: pump events.
          * platform_pump_events updates s_keystate via HandleSDLEvent.
          * Copy to g_diKeyboardState so the game's input system sees the keys. */
@@ -1750,11 +1753,17 @@ race_start:
                 }
             }
             RACE_MARK("before RenderHUD");
+#ifdef SONICR_XBOX
+            { extern unsigned g_dbgTLoop, g_dbgLogicMs, g_dbgTHud; g_dbgTHud = (unsigned)SDL_GetTicks(); g_dbgLogicMs += g_dbgTHud - g_dbgTLoop; }
+#endif
             if (g_skipThisFrame == 0) {
                 UpdateFrameTimers();
                 RenderHUD();
             }
             RACE_MARK("after RenderHUD");
+#ifdef SONICR_XBOX
+            { extern unsigned g_dbgTHud, g_dbgRenderMs; g_dbgRenderMs += (unsigned)SDL_GetTicks() - g_dbgTHud; }
+#endif
             g_raceElapsedDisplay = timeGetTime_ms() / 1000 - g_raceTimerDisplayBase;
             UpdateLapCounter(1);
             if (g_skipThisFrame == 0) {

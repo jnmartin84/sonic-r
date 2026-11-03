@@ -2324,13 +2324,13 @@ void DrawGroundParticlesD3D(int vpIdx)
         R_SetTexEnv(R_TEXENV_MODULATE);
 
         RenderVertex dotVerts[4] = {
-            {(float)sx0, (float)sy0, (float)(cz0 + 16) * invDepthScale,
+            {(float)sx0, (float)sy0, (float)((cz0 > 40 ? cz0 - 24 : 16)) * invDepthScale,
              1.0f / (float)(cz0 + 16), dotColor, 0, 0.875f, vStart},
-            {(float)sx1, (float)sy1, (float)(cz1 + 16) * invDepthScale,
+            {(float)sx1, (float)sy1, (float)((cz1 > 40 ? cz1 - 24 : 16)) * invDepthScale,
              1.0f / (float)(cz1 + 16), dotColor, 0, 1.0f, vStart},
-            {(float)sx2, (float)sy2, (float)(cz2 + 16) * invDepthScale,
+            {(float)sx2, (float)sy2, (float)((cz2 > 40 ? cz2 - 24 : 16)) * invDepthScale,
              1.0f / (float)(cz2 + 16), dotColor, 0, 1.0f, vStart + vSize},
-            {(float)sx3, (float)sy3, (float)(cz3 + 16) * invDepthScale,
+            {(float)sx3, (float)sy3, (float)((cz3 > 40 ? cz3 - 24 : 16)) * invDepthScale,
              1.0f / (float)(cz3 + 16), dotColor, 0, 0.875f, vStart + vSize},
         };
         R_DrawQuad(dotVerts);

@@ -98,6 +98,9 @@ static int s_pendingRGBAHeight[52];
  * set, GL_UploadTpage prefers it over the 16bpp buffer. Dimensions come from
  * g_tpageWidth/Height like the normal path. */
 static unsigned char *s_tpageRGBA8Buf[52];
+#ifdef SONICR_XBOX
+static unsigned short *s_frozenCopy[52];   /* GPU-side image of frozen tpages */
+#endif
 
 /**
  * GL_InitTextures — create GL texture objects for all tpage slots.
@@ -374,6 +377,18 @@ void GL_FreezeTpage(int tpage)
     }
     if (tpage >= 0 && tpage < 52 && g_tpagePixelBuf[tpage] != NULL) {
         GL_UploadTpage(tpage);
+#ifdef SONICR_XBOX
+        /* Remember exactly what the GPU copy holds; later sub-rect patches are
+         * merged into this snapshot (the CPU buffer may drift away from it). */
+        {
+            int w = g_tpageWidth[tpage] ? g_tpageWidth[tpage] : 256;
+            int h = g_tpageHeight[tpage] ? g_tpageHeight[tpage] : 256;
+            free(s_frozenCopy[tpage]);
+            s_frozenCopy[tpage] = (unsigned short *)malloc((size_t)w * h * 2);
+            if (s_frozenCopy[tpage])
+                memcpy(s_frozenCopy[tpage], g_tpagePixelBuf[tpage], (size_t)w * h * 2);
+        }
+#endif
     }
 }
 
@@ -397,9 +412,20 @@ static void GL_UploadTpageSubRectImpl(int tpage, int destX, int destY, int width
     /* glTexSubImage2D does not reach the GPU copy on pbgl (minimap, rain
      * splashes and plop sprites patched into the frozen HUD tpage never show up).
      * The CPU pixel buffer already holds every patch, so re-upload the whole page. */
-    (void)destX; (void)destY; (void)width; (void)height;
     if (tpage >= 0 && tpage < 52 && g_tpagePixelBuf[tpage] != NULL) {
-        GL_UploadTpageImpl(tpage);
+        unsigned short *cur = (unsigned short *)g_tpagePixelBuf[tpage];
+        unsigned short *snap = s_frozenCopy[tpage];
+        int tw = g_tpageWidth[tpage] ? g_tpageWidth[tpage] : 256;
+        if (snap) {
+            for (int row = 0; row < height; row++)
+                memcpy(&snap[(destY + row) * tw + destX], &cur[(destY + row) * tw + destX],
+                       (size_t)width * 2);
+            g_tpagePixelBuf[tpage] = snap;
+            GL_UploadTpageImpl(tpage);
+            g_tpagePixelBuf[tpage] = cur;
+        } else {
+            GL_UploadTpageImpl(tpage);
+        }
     }
     return;
 #endif
