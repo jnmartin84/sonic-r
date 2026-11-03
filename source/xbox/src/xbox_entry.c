@@ -114,9 +114,29 @@ static void xb_make_save_folder(const char *id, const char *name)
     xb_write_if_missing(p, xb_saveimage_xbx, sizeof(xb_saveimage_xbx));
 }
 
+/* TitleMeta.xbx is UTF-16LE; true if it already names this game. */
+static int xb_folder_is_ours(const char *folder)
+{
+    char p[160];
+    unsigned char b[256];
+    snprintf(p, sizeof(p), "%s\\TitleMeta.xbx", folder);
+    if (!xb_exists(p)) return 1;                 /* unused folder: free to take */
+    FILE *f = fopen(p, "rb");
+    if (!f) return 0;
+    size_t n = fread(b, 1, sizeof(b), f);
+    fclose(f);
+    static const char name[] = "Sonic R";
+    for (size_t i = 0; i + 2 * (sizeof(name) - 1) <= n; i++) {
+        size_t k = 0;
+        while (k < sizeof(name) - 1 && b[i + 2 * k] == (unsigned char)name[k] && b[i + 2 * k + 1] == 0) k++;
+        if (k == sizeof(name) - 1) return 1;
+    }
+    return 0;                                    /* belongs to another title */
+}
+
 static void xb_udata_init(void)
 {
-    char p[160], q[160];
+    char p[160], q[160], old[48];
     unsigned long tid = (unsigned long)CURRENT_XBE_HEADER->CertificateHeader->TitleID;
 
     s_ud[0] = 0;
@@ -124,7 +144,17 @@ static void xb_udata_init(void)
         fprintf(stderr, "UDATA: cannot mount E:, saving next to the game\n");
         return;
     }
-    snprintf(s_ud, sizeof(s_ud), "E:\\UDATA\\%08lX", tid);
+    /* Never share a folder with another game: if the folder for our title ID is
+     * already used by a different title, move on to the next free ID. */
+    for (int k = 0; k < 32; k++) {
+        snprintf(s_ud, sizeof(s_ud), "E:\\UDATA\\%08lX", (tid + (unsigned long)k) & 0xFFFFFFFFUL);
+        if (xb_folder_is_ours(s_ud)) break;
+        s_ud[0] = 0;
+    }
+    if (!s_ud[0]) {
+        fprintf(stderr, "UDATA: no free title folder, saving next to the game\n");
+        return;
+    }
     xb_mkdirs(s_ud);
     if (!xb_exists(s_ud)) {
         fprintf(stderr, "UDATA: cannot create %s, saving next to the game\n", s_ud);
@@ -156,6 +186,23 @@ static void xb_udata_init(void)
     xb_copy_if_missing("D:\\SONICR.INF", q);
     snprintf(q, sizeof(q), "%s\\%s\\JOYSTICK.INF", s_ud, UD_SETTINGS);
     xb_copy_if_missing("D:\\JOYSTICK.INF", q);
+    /* Import from the 53520001 folder used by an earlier test build. */
+    snprintf(old, sizeof(old), "E:\\UDATA\\53520001");
+    if (xb_exists(old) && strcmp(old, s_ud)) {
+        for (int i = 1; i <= 8; i++) {
+            snprintf(p, sizeof(p), "%s\\%s\\SAVE\\R0%d.SAV", old, UD_SAVES, i);
+            snprintf(q, sizeof(q), "%s\\%s\\SAVE", s_ud, UD_SAVES);
+            xb_mkdirs(q);
+            snprintf(q, sizeof(q), "%s\\%s\\SAVE\\R0%d.SAV", s_ud, UD_SAVES, i);
+            xb_copy_if_missing(p, q);
+        }
+        snprintf(p, sizeof(p), "%s\\%s\\SONICR.INF", old, UD_SETTINGS);
+        snprintf(q, sizeof(q), "%s\\%s\\SONICR.INF", s_ud, UD_SETTINGS);
+        xb_copy_if_missing(p, q);
+        snprintf(p, sizeof(p), "%s\\%s\\JOYSTICK.INF", old, UD_SETTINGS);
+        snprintf(q, sizeof(q), "%s\\%s\\JOYSTICK.INF", s_ud, UD_SETTINGS);
+        xb_copy_if_missing(p, q);
+    }
     fprintf(stderr, "UDATA: saving to %s\n", s_ud);
 }
 
@@ -260,7 +307,9 @@ int main(void)
     fprintf(stderr, "exit: returning to dashboard\n");
     fflush(stderr);
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
-    XLaunchXBE(NULL);
+    SDL_Delay(200);
+    /* A full reboot lands on the dashboard on every setup; XLaunchXBE(NULL)
+     * (quick reboot) left a black screen on this console. */
     XReboot();
     return 0;
 }

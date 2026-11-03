@@ -57,8 +57,8 @@ def xpr(size):
     hdr_size = 0x800
     total = hdr_size + len(data)
     hdr = struct.pack("<4sIIIIIIII", b"XPR0", total, hdr_size,
-                      0x00040001, 0, 0, fmt, 0, 0xFFFFFFFF)
-    hdr += b"\0" * (hdr_size - len(hdr))
+                      0x00040001, hdr_size, 0, fmt, 0, 0xFFFFFFFF)
+    hdr += b"\xAD" * (hdr_size - len(hdr))
     return hdr + data
 
 def carr(name, b):
