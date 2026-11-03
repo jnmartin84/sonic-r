@@ -106,8 +106,14 @@ static unsigned short *s_frozenCopy[52];   /* GPU-side image of frozen tpages */
  * GL_InitTextures — create GL texture objects for all tpage slots.
  * Called once at startup.
  */
+#ifdef SONICR_XBOX
+extern void xb_batch_end(void);
+#endif
 void GL_InitTextures(void)
 {
+#ifdef SONICR_XBOX
+    xb_batch_end();
+#endif
     if (s_glTexturesInited) {
         return;
     }
@@ -294,6 +300,9 @@ int g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs;
 void GL_UploadTpage(int tpage)
 {
 #ifdef SONICR_XBOX
+    xb_batch_end();
+#endif
+#ifdef SONICR_XBOX
     unsigned t0 = (unsigned)SDL_GetTicks();
 #endif
     GL_UploadTpageImpl(tpage);
@@ -331,6 +340,9 @@ static void GL_UploadTpageRGBAImpl(int tpage, unsigned char *rgba, int w, int h)
 
 void GL_UploadTpageRGBA(int tpage, unsigned char *rgba, int w, int h)
 {
+#ifdef SONICR_XBOX
+    xb_batch_end();
+#endif
     GL_UploadTpageRGBAImpl(tpage, rgba, w, h);
 #ifdef SONICR_XBOX
     R_InvalidateBoundTexture();
@@ -486,6 +498,9 @@ static void GL_UploadTpageSubRectImpl(int tpage, int destX, int destY, int width
 
 void GL_UploadTpageSubRect(int tpage, int destX, int destY, int width, int height)
 {
+#ifdef SONICR_XBOX
+    xb_batch_end();
+#endif
     GL_UploadTpageSubRectImpl(tpage, destX, destY, width, height);
 #ifdef SONICR_XBOX
     R_InvalidateBoundTexture();
@@ -514,6 +529,9 @@ void GL_SetPendingRGBA(int tpage, unsigned char *rgba, int w, int h)
  */
 void BeginFrame(void)
 {
+#ifdef SONICR_XBOX
+    xb_batch_end();
+#endif
     /* Clear vertex buffer depth fields (offset 0x30 per vertex, stride 0x40)
      * to prevent stale geometry from previous frames showing as glitchy
      * triangles. Only zeroes the depth int, not the source positions. */
@@ -618,6 +636,9 @@ void BeginFrame(void)
  */
 void EndFrame(void)
 {
+#ifdef SONICR_XBOX
+    xb_batch_end();
+#endif
 #ifdef SONICR_GLES2
     R_GLES2_FlushVerts();
 #endif
@@ -733,6 +754,7 @@ void ProcessTpageStates(void)                                   /* 0x4323cc */
      * Ensure depth mask is ON — glClear respects glDepthMask, and a
      * previous frame may have left it FALSE (e.g. DrawFootShadows). */
 #ifdef SONICR_XBOX
+    xb_batch_end();
     { extern void GL_MenuFrameStart(void); GL_MenuFrameStart(); }
 #endif
     R_DisableScissor();
@@ -856,6 +878,9 @@ static void MenuWavePredraw(void);
 #endif
 void RenderBackground(void)
 {
+#ifdef SONICR_XBOX
+    xb_batch_end();
+#endif
     extern int g_gameState;
 
     /* Confine glClear to the 4:3 area so sky/menu colors don't
@@ -871,6 +896,9 @@ void RenderBackground(void)
         glClear(GL_COLOR_BUFFER_BIT);
         R_DisableScissor();
         R_FlushState();
+#ifdef SONICR_XBOX
+        MenuWavePredraw();   /* post-race screens still have the intro countdown in range */
+#endif
         return;
     }
 
@@ -1287,6 +1315,7 @@ void GL_DebugViewTpage(int tp, int x, int y, int size)
     if (s_glTextureDirty[tp]) {
         GL_UploadTpage(tp);
     }
+    xb_batch_end();
     glViewport(0, 0, 640, 480);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);

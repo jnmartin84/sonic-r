@@ -2236,6 +2236,15 @@ void DrawGroundParticlesD3D(int vpIdx)
 
     float invDepthScale = 1.0f / (g_farClipFloat + 16.0f);
 
+    /* Do not depend on whatever state the previous draw left behind. */
+    R_PushState();
+    R_SetBlendMode(R_BLEND_ALPHA);
+    R_SetAlphaTest(1);
+    R_SetAlphaRef(0.01f);
+    R_SetDepthTest(1);
+    R_SetDepthFunc(R_DEPTH_LEQUAL);
+    R_SetDepthWrite(0);
+
     for (int slot = 0; slot < 16; slot++) {
         GroundParticle *gp = &g_particleSlots[slot];
         int tpage = g_tpageParallax1;
@@ -2345,6 +2354,7 @@ void DrawGroundParticlesD3D(int vpIdx)
     next:
         ;  /* continue to next slot */
     }
+    R_PopState();
 }
 
 /**

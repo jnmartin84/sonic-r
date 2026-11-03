@@ -29,9 +29,11 @@ EXCLUDE := -path '$(SDL_SRC)/net/bearssl/*' \
 SRCS := $(shell find $(SDL_SRC) -name '*.c' ! \( $(EXCLUDE) \)) \
         $(XBOX_DIR)/src/xbox_mixer.c \
         $(XBOX_DIR)/src/xbox_net_stub.c \
-        $(XBOX_DIR)/src/xbox_entry.c
+        $(XBOX_DIR)/src/xbox_entry.c \
+        $(XBOX_DIR)/src/xbox_fastdraw.c
 
 include $(NXDK_DIR)/Makefile
+$(XBOX_DIR)/src/xbox_fastdraw.obj: CFLAGS += -I$(NXDK_DIR)/lib/pbgl/src
 LDFLAGS += /MAP:$(XBOX_DIR)/main.map
 include $(NXDK_DIR)/lib/pbgl/Makefile
 

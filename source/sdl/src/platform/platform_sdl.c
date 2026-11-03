@@ -944,6 +944,7 @@ void xbox_start_watchdog(void) { SDL_CreateThread(xb_watchdog, "watchdog", NULL)
 void platform_gl_swap(void)
 {
 #ifdef SONICR_XBOX
+    { extern void xb_batch_end(void); xb_batch_end(); }
     {
         static int s_frames;
         s_frames++;

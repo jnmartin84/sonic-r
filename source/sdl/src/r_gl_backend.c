@@ -99,6 +99,13 @@ static const R_StateSnapshot s_defaults = {
 /* GL texture objects and dirty flags — still owned by render_gl.c,
  * accessed here via extern for texture binding during R_FlushState. */
 extern GLuint s_glTextures[];       /* render_gl.c */
+#ifdef SONICR_XBOX
+extern void xb_batch_end(void);
+extern void xb_draw_fan(const float *verts, int n);
+#define XB_BEND() xb_batch_end()
+#else
+#define XB_BEND() ((void)0)
+#endif
 
 /* Per-tpage filter override, and the filter actually resident on each GL
  * texture object.
@@ -126,6 +133,7 @@ static void GL_ApplyTpageFilter(int tp)
         want = (unsigned char)(s_desired.filter + 1);
     }
     if (s_glTextureFilter[tp] != want) {
+        XB_BEND();
         GLenum f = (want == (unsigned char)(R_FILTER_LINEAR + 1)) ? GL_LINEAR
                                                                   : GL_NEAREST;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, f);
@@ -144,6 +152,7 @@ void R_FlushState(void)
      * Dirty-texture uploads still happen even on a cache hit (the tpage
      * data changed, not the binding). */
     if (s_desired.textureId != s_current.textureId) {
+        XB_BEND();
         if (s_desired.textureId < 0) {
             glDisable(GL_TEXTURE_2D);
         } else {
@@ -181,6 +190,7 @@ void R_FlushState(void)
 
     /* Depth test */
     if (s_desired.depthTest != s_current.depthTest) {
+        XB_BEND();
         if (s_desired.depthTest) {
             glEnable(GL_DEPTH_TEST);
         }
@@ -192,6 +202,7 @@ void R_FlushState(void)
 
     /* Depth function */
     if (s_desired.depthFunc != s_current.depthFunc) {
+        XB_BEND();
         switch (s_desired.depthFunc) {
             case R_DEPTH_LEQUAL:
                 glDepthFunc(GL_LEQUAL);
@@ -208,12 +219,14 @@ void R_FlushState(void)
 
     /* Depth write */
     if (s_desired.depthWrite != s_current.depthWrite) {
+        XB_BEND();
         glDepthMask(s_desired.depthWrite ? GL_TRUE : GL_FALSE);
         s_current.depthWrite = s_desired.depthWrite;
     }
 
     /* Texture environment (overbright) */
     if (s_desired.texEnv != s_current.texEnv) {
+        XB_BEND();
 #if defined(__EMSCRIPTEN__) || defined(SONICR_XBOX)
         /* WebGL legacy GL emulation (and pbgl on the Xbox) doesn't support GL_COMBINE/GL_ADD_SIGNED.
          * Fall back to plain GL_MODULATE for all modes. */
@@ -237,6 +250,7 @@ void R_FlushState(void)
 
     /* Blend mode */
     if (s_desired.blendMode != s_current.blendMode) {
+        XB_BEND();
         switch (s_desired.blendMode) {
             case R_BLEND_NONE:
                 glDisable(GL_BLEND);
@@ -260,10 +274,18 @@ void R_FlushState(void)
      * already has one). */
     s_current.filter = s_desired.filter;
 
-    glDisable(GL_CULL_FACE);
+    {
+        static int s_cullOff;
+        if (!s_cullOff) {
+            XB_BEND();
+            glDisable(GL_CULL_FACE);   /* pbgl keeps this; no need to re-send per draw */
+            s_cullOff = 1;
+        }
+    }
 
     /* Alpha test */
     if (s_desired.alphaTest != s_current.alphaTest) {
+        XB_BEND();
         if (s_desired.alphaTest) {
             glEnable(GL_ALPHA_TEST);
         }
@@ -275,12 +297,14 @@ void R_FlushState(void)
 
     /* Alpha ref */
     if (s_desired.alphaRef != s_current.alphaRef) {
+        XB_BEND();
         glAlphaFunc(GL_GREATER, s_desired.alphaRef);
         s_current.alphaRef = s_desired.alphaRef;
     }
 
     /* Scissor enable/disable */
     if (s_desired.scissorEnabled != s_current.scissorEnabled) {
+        XB_BEND();
         if (s_desired.scissorEnabled) {
             glEnable(GL_SCISSOR_TEST);
         }
@@ -297,6 +321,7 @@ void R_FlushState(void)
          s_desired.scissorW != s_current.scissorW ||
          s_desired.scissorH != s_current.scissorH))
     {
+        XB_BEND();
         glScissor(s_desired.scissorX, s_desired.scissorY,
                   s_desired.scissorW, s_desired.scissorH);
         s_current.scissorX = s_desired.scissorX;
@@ -459,26 +484,10 @@ static inline void R_EmitVertex(const RenderVertex *v)
 {
     uint32_t argb = v->color;
     float a = (float)((argb >> 24) & 0xFF) / 255.0f;
-#ifdef SONICR_XBOX
-    int dbgForceUV = (g_dbgMode == 2);
-#endif
     float r = (float)((argb >> 16) & 0xFF) / 255.0f;
     float g = (float)((argb >>  8) & 0xFF) / 255.0f;
     float b = (float)((argb      ) & 0xFF) / 255.0f;
-#ifdef SONICR_XBOX
-    if (g_dbgMode == 1) { r = 1.0f; g = 0.0f; b = 1.0f; a = 1.0f; }   /* magenta blocks */
-    if (g_dbgMode == 2) { r = g = b = a = 1.0f; }
-#endif
     glColor4f(r, g, b, a);
-#ifdef SONICR_XBOX
-    if (dbgForceUV) {
-        /* whole texture across the quad: corner order is (0,0),(1,0),(1,1),(0,1) */
-        static int s_corner;
-        static const float cu[4] = {0,1,1,0}, cv[4] = {0,0,1,1};
-        glTexCoord2f(cu[s_corner & 3], cv[s_corner & 3]);
-        s_corner++;
-    } else
-#endif
     glTexCoord2f(v->u, v->v);
 
     float w = (v->rhw > 0.0f) ? (1.0f / v->rhw) : 1.0f;
@@ -515,13 +524,23 @@ void R_DrawTriFan(const RenderVertex *v, int count)
             break;
         }
     }
-    if (g_dbgMode >= 1 && g_dbgMode <= 3) {
-        /* strip everything that could hide a quad */
-        glDisable(GL_DEPTH_TEST);  s_current.depthTest = -1;
-        glDisable(GL_ALPHA_TEST);  s_current.alphaTest = -1;
-        glDisable(GL_BLEND);       s_current.blendMode = -1;
-        if (g_dbgMode == 1) { glDisable(GL_TEXTURE_2D); s_current.textureId = -99; }
+    if (count <= 16) {
+        float buf[16 * 10];
+        for (int i = 0; i < count; i++) {
+            uint32_t argb = v[i].color;
+            float w = (v[i].rhw > 0.0f) ? (1.0f / v[i].rhw) : 1.0f;
+            float *o = &buf[i * 10];
+            o[0] = v[i].sx * w;  o[1] = v[i].sy * w;  o[2] = v[i].sz * w;  o[3] = w;
+            o[4] = (float)((argb >> 16) & 0xFF) / 255.0f;
+            o[5] = (float)((argb >>  8) & 0xFF) / 255.0f;
+            o[6] = (float)((argb      ) & 0xFF) / 255.0f;
+            o[7] = (float)((argb >> 24) & 0xFF) / 255.0f;
+            o[8] = v[i].u;  o[9] = v[i].v;
+        }
+        xb_draw_fan(buf, count);
+        return;
     }
+    XB_BEND();
 #endif
 
     glBegin(GL_TRIANGLE_FAN);
@@ -676,6 +695,7 @@ void R_ClearAndReset(void)
 void R_ClearDepth(void)
 {
     R_FlushState();
+    XB_BEND();
     glClear(GL_DEPTH_BUFFER_BIT);
 }
 
