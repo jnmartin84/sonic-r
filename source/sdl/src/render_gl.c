@@ -696,6 +696,9 @@ void ProcessTpageStates(void)                                   /* 0x4323cc */
     /* Disable scissor so the black clear covers the entire window.
      * Ensure depth mask is ON — glClear respects glDepthMask, and a
      * previous frame may have left it FALSE (e.g. DrawFootShadows). */
+#ifdef SONICR_XBOX
+    { extern void GL_MenuFrameStart(void); GL_MenuFrameStart(); }
+#endif
     R_DisableScissor();
     R_SetDepthWrite(1);
     R_FlushState();
@@ -812,6 +815,9 @@ void CleanupD3DTPages(void)                                /* 0x4332ac */
  * Binary does IDirect3DViewport2::Clear (solid color fill).
  * For OpenGL: clear to color.
  */
+#ifdef SONICR_XBOX
+static void MenuWavePredraw(void);
+#endif
 void RenderBackground(void)
 {
     extern int g_gameState;
@@ -839,6 +845,9 @@ void RenderBackground(void)
     glClear(GL_COLOR_BUFFER_BIT);
     R_DisableScissor();
     R_FlushState();
+#ifdef SONICR_XBOX
+    MenuWavePredraw();
+#endif
 }
 
 /* ---------------------------------------------------------------------------
@@ -1046,7 +1055,7 @@ void RenderWavingMenuBackgroundD3D(void)
  * The 49 records all go into one depth bucket, ([0x6D7638] + [0x6D763C]) / 2
  * at 0x4C6A3E; for GL that is just draw order.
  */
-void RenderWavingMenuBackground(void)
+static void WavingDraw(void)
 {
     int tpage = g_uiTexPage;                                /* 0x8F6C48 */
 
@@ -1139,6 +1148,35 @@ void RenderWavingMenuBackground(void)
 
     R_PopState();
 }
+
+#ifdef SONICR_XBOX
+/* Menu screens draw their sprites and only then call RenderWavingMenuBackground.
+ * On hardware that full-screen wallpaper ends up on top of everything, so the
+ * sprites/text vanish. Once a screen has called it, draw the wallpaper at the
+ * start of the following frames (from RenderBackground) instead, with the depth
+ * test off, and turn the late call into a no-op. */
+static int s_waveCur, s_wavePrev, s_waveDone;
+void GL_MenuFrameStart(void) { s_wavePrev = s_waveCur; s_waveCur = 0; s_waveDone = 0; }
+static void MenuWavePredraw(void)
+{
+    if (s_wavePrev && !s_waveDone) {
+        s_waveDone = 1;
+        R_PushState();
+        R_SetDepthTest(0);
+        R_SetDepthWrite(0);
+        WavingDraw();
+        R_PopState();
+    }
+}
+void RenderWavingMenuBackground(void)
+{
+    s_waveCur = 1;
+    if (s_waveDone) return;
+    WavingDraw();
+}
+#else
+void RenderWavingMenuBackground(void) { WavingDraw(); }
+#endif
 
 /**
  * GL_SetColorKey — mark a tpage as needing color-key transparency.
