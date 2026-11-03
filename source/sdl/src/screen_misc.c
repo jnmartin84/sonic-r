@@ -21,6 +21,13 @@
 #include <stdarg.h>
 #ifdef SONICR_XBOX
 #include "xbox_menu_patch.h"
+/* Controls page is pad-only: first item (Set Joystick) sits at offset 0, and
+ * the pad's Back button replaces ESC as "cancel". */
+#define XB_PAD_ITEM_OFS 0
+#define XB_CANCEL_PRESSED() ((g_diKeyboardState[0x01] != 0) || (g_keyPressState[4] & 0x80))
+#else
+#define XB_PAD_ITEM_OFS 3
+#define XB_CANCEL_PRESSED() (g_diKeyboardState[0x01] != 0)
 #endif
 
 void SoftwareRenderSortedPolygons(void);
@@ -425,7 +432,11 @@ static const int s_optPageItems[7][2] = {
     { 23, 30 },   /* 3: Graphics */
     { 99, 99 },   /* 4: unused */
     { 31, 31 },   /* 5: Exit to Windows confirm (YES/NO) */
+#ifdef SONICR_XBOX
+    { 35, 36 },   /* 6: Controls — pad only (Set Joystick, Back) */
+#else
     { 32, 36 },   /* 6: Controls */
+#endif
 };
 
 /* =====================================================================
@@ -891,10 +902,14 @@ static void DrawControlsRemapLabels(void)
         | ((unsigned)val << 16)
         | ((unsigned)val << 8)
         | (unsigned)val;
+#ifndef SONICR_XBOX   /* no ESC key on the console */
     DrawTexturedQuad(0x10, 0x1BA, 0x43FA0000,
                      0x48, 0x1A, tpage3,
                      0xDC, 0x6B, 0x24, 0x0D,
                      pulseColor);
+#else
+    (void)pulseColor;
+#endif
 
     /* 10 action label rows — left (P1) and right (P2) columns */
     int yPos = 0x96;
@@ -983,10 +998,14 @@ static void DrawJoystickRemapProgress(char *slotPtr)
         | ((unsigned)val << 16)
         | ((unsigned)val << 8)
         | (unsigned)val;
+#ifndef SONICR_XBOX   /* no ESC key on the console */
     DrawTexturedQuad(0x10, 0x1BA, 0x43FA0000,
                      0x48, 0x1A, tpage3,
                      0xDC, 0x6B, 0x24, 0x0D,
                      pulseColor);
+#else
+    (void)pulseColor;
+#endif
 
     /* Action label rows — ROM table indexed by (cappedCount-3) */
     int cfgIdx = cappedCount - 3;
@@ -1798,7 +1817,7 @@ int OptionsMenuScreen(void)
              *     the ESC path — case 33/34 set it to 1 on entry so that the
              *     SPACE/RETURN press used to enter the sub-page doesn't get
              *     captured as the first slot. */
-            if (g_diKeyboardState[0x01] != 0) {
+            if (XB_CANCEL_PRESSED()) {
                 if (g_optEscGate == 0) {
                     PlaySoundEffect(0, 0, 0);
                 }
@@ -1901,11 +1920,11 @@ int OptionsMenuScreen(void)
             char *slotPtr = (char *)&g_joystickSlots[playerSlot][0];
             int btnCount = *(short *)(slotPtr + 0x118);
 
-            if (g_diKeyboardState[0x01] != 0) {
+            if (XB_CANCEL_PRESSED()) {
                 /* ESC = cancel — return to controls page, no commit */
                 if (g_optEscGate == 0) {
                     PlaySoundEffect(0, 0, 0);
-                    InitOptionsMenuPage(6, 3);
+                    InitOptionsMenuPage(6, XB_PAD_ITEM_OFS);
                     g_optKeyRemapState = 0;
 #if 0
                     fprintf(stderr, "[joy-remap] cancelled\n");
@@ -1971,7 +1990,7 @@ int OptionsMenuScreen(void)
                         cappedCount, playerSlot);
 #endif
                     SavePadTypesImpl();
-                    InitOptionsMenuPage(6, 3);
+                    InitOptionsMenuPage(6, XB_PAD_ITEM_OFS);
                     g_optKeyRemapState = 0;
                     g_optEscGate       = 1;
                     s_jrLastReported   = -1;

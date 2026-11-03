@@ -977,8 +977,10 @@ void platform_gl_swap(void)
             /* Back button cycles debug render modes (0 = normal). */
             extern int g_dbgMode;
             static int s_backPrev;
+            /* Back alone is the menu "cancel"; the debug cycle needs LB + Back. */
             int back = (s_pads[0].ctrl &&
-                        SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_BACK)) ? 1 : 0;
+                        SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_BACK) &&
+                        SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) ? 1 : 0;
             if (back && !s_backPrev) {
                 g_dbgMode = (g_dbgMode + 1) % 9;   /* 1=magenta blocks 2=full texture 3=no tests 5-8=viewer */
                 {
