@@ -393,6 +393,16 @@ void GL_ClearTpageDirty(int tpage)
  */
 static void GL_UploadTpageSubRectImpl(int tpage, int destX, int destY, int width, int height)
 {
+#ifdef SONICR_XBOX
+    /* glTexSubImage2D does not reach the GPU copy on pbgl (minimap, rain
+     * splashes and plop sprites patched into the frozen HUD tpage never show up).
+     * The CPU pixel buffer already holds every patch, so re-upload the whole page. */
+    (void)destX; (void)destY; (void)width; (void)height;
+    if (tpage >= 0 && tpage < 52 && g_tpagePixelBuf[tpage] != NULL) {
+        GL_UploadTpageImpl(tpage);
+    }
+    return;
+#endif
     if (!s_glTexturesInited) {
         GL_InitTextures();
     }
@@ -1170,8 +1180,10 @@ static void MenuWavePredraw(void)
 }
 void RenderWavingMenuBackground(void)
 {
+    int first = !s_wavePrev;
     s_waveCur = 1;
     if (s_waveDone) return;
+    if (first) return;   /* first frame of a menu: next frame draws it behind the sprites */
     WavingDraw();
 }
 #else

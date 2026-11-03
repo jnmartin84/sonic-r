@@ -917,6 +917,7 @@ void platform_audio_shutdown(void)
 #ifdef SONICR_XBOX
 volatile const char *g_lastMark = "start";
 volatile int g_xbFrames;
+static unsigned *g_dbgSwapAcc;
 extern int g_dbgMode;
 static int xb_watchdog(void *arg)
 {
@@ -975,7 +976,32 @@ void platform_gl_swap(void)
         }
         if (s_frames <= 3 || s_frames % 600 == 0)
             fprintf(stderr, "frame %d\n", s_frames);
-        if (s_frames % 600 == 0 || s_frames < 4) {
+        {
+            /* Frame-time statistics, printed together once per 600 frames. */
+            static unsigned s_t0, s_tPrev, s_n50, s_n80, s_n120, s_max, s_swapMs, s_cnt;
+            static unsigned s_logMs;
+            unsigned nowT = (unsigned)SDL_GetTicks();
+            if (s_tPrev) {
+                unsigned dt = nowT - s_tPrev;
+                if (dt > 50) s_n50++;
+                if (dt > 80) s_n80++;
+                if (dt > 120) s_n120++;
+                if (dt > s_max && !(s_frames % 600 == 1)) s_max = dt;
+                s_cnt++;
+            }
+            s_tPrev = nowT;
+            if (!s_t0) s_t0 = nowT;
+            if (s_frames % 600 == 0) {
+                unsigned span = nowT - s_t0;
+                fprintf(stderr, "timing: %u frames in %u ms (avg %u.%u ms), >50ms:%u >80ms:%u >120ms:%u max:%u ms, swap-wait avg %u us\n",
+                        s_cnt, span, s_cnt ? span / s_cnt : 0, s_cnt ? (span * 10 / s_cnt) % 10 : 0,
+                        s_n50, s_n80, s_n120, s_max, s_cnt ? s_swapMs * 1000u / s_cnt : 0);
+                s_t0 = nowT; s_n50 = s_n80 = s_n120 = s_max = s_swapMs = s_cnt = 0;
+                (void)s_logMs;
+            }
+            g_dbgSwapAcc = &s_swapMs;
+        }
+        if ((s_frames % 600 == 0 && g_dbgMode >= 5) || s_frames < 4) {
             extern int g_dbgDraws[53]; extern float g_dbgVert[53][6];
             for (int t = 0; t < 53; t++) if (g_dbgDraws[t]) {
                 fprintf(stderr, "  draws tpage %d: %d  v0=(%d,%d,z*1e6=%d,rhw*1e6=%d,a%d) st=%d\n", t,
@@ -984,6 +1010,10 @@ void platform_gl_swap(void)
                         (int)g_dbgVert[t][4], (int)g_dbgVert[t][5]);
                 g_dbgDraws[t] = 0;
             }
+        }
+        if (s_frames % 600 == 0) {
+            extern int g_dbgDraws[53];
+            for (int t = 0; t < 53; t++) g_dbgDraws[t] = 0;
         }
         {
             /* Report the first few GL errors: they point at unsupported state. */
@@ -1008,7 +1038,11 @@ void platform_gl_swap(void)
                 fprintf(stderr, "pushbuffer: frame used %u KB\n", used / 1024u);
             }
         }
-        pbgl_swap_buffers();
+        {
+            unsigned ts = (unsigned)SDL_GetTicks();
+            pbgl_swap_buffers();
+            if (g_dbgSwapAcc) *g_dbgSwapAcc += (unsigned)SDL_GetTicks() - ts;
+        }
         s_pbStart = pb_begin();
         pb_end(s_pbStart);
     }
