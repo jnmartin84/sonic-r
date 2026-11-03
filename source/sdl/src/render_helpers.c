@@ -103,7 +103,6 @@ void DrawTexturedQuad(int xPos, int yPos, int depth, int width, int height,
     /* Immediate submission - set state and draw */
 #ifdef SONICR_XBOX
     extern int g_dbgMode;
-    if (g_dbgMode == 1) { R_PushState(); R_SetDepthTest(0); }
 #endif
     R_SetTexture(tpage);
     R_SetTexEnv(R_TEXENV_MODULATE);  /* HUD: no overbright */
@@ -116,7 +115,6 @@ void DrawTexturedQuad(int xPos, int yPos, int depth, int width, int height,
     };
     R_DrawQuad(v);
 #ifdef SONICR_XBOX
-    if (g_dbgMode == 1) R_PopState();
 #endif
     #undef POS_SCALE
     #undef UV_SCALE_Q

@@ -460,12 +460,25 @@ static inline void R_EmitVertex(const RenderVertex *v)
     uint32_t argb = v->color;
     float a = (float)((argb >> 24) & 0xFF) / 255.0f;
 #ifdef SONICR_XBOX
-    if (g_dbgMode == 3 || g_dbgMode == 4) a = 1.0f;
+    int dbgForceUV = (g_dbgMode == 2);
 #endif
     float r = (float)((argb >> 16) & 0xFF) / 255.0f;
     float g = (float)((argb >>  8) & 0xFF) / 255.0f;
     float b = (float)((argb      ) & 0xFF) / 255.0f;
+#ifdef SONICR_XBOX
+    if (g_dbgMode == 1) { r = 1.0f; g = 0.0f; b = 1.0f; a = 1.0f; }   /* magenta blocks */
+    if (g_dbgMode == 2) { r = g = b = a = 1.0f; }
+#endif
     glColor4f(r, g, b, a);
+#ifdef SONICR_XBOX
+    if (dbgForceUV) {
+        /* whole texture across the quad: corner order is (0,0),(1,0),(1,1),(0,1) */
+        static int s_corner;
+        static const float cu[4] = {0,1,1,0}, cv[4] = {0,0,1,1};
+        glTexCoord2f(cu[s_corner & 3], cv[s_corner & 3]);
+        s_corner++;
+    } else
+#endif
     glTexCoord2f(v->u, v->v);
 
     float w = (v->rhw > 0.0f) ? (1.0f / v->rhw) : 1.0f;
@@ -495,9 +508,12 @@ void R_DrawTriFan(const RenderVertex *v, int count)
 
     R_FlushState();
 #ifdef SONICR_XBOX
-    if (g_dbgMode == 2 || g_dbgMode == 4) {
-        glDisable(GL_DEPTH_TEST);
-        s_current.depthTest = -1;     /* force re-sync on the next flush */
+    if (g_dbgMode >= 1 && g_dbgMode <= 3) {
+        /* strip everything that could hide a quad */
+        glDisable(GL_DEPTH_TEST);  s_current.depthTest = -1;
+        glDisable(GL_ALPHA_TEST);  s_current.alphaTest = -1;
+        glDisable(GL_BLEND);       s_current.blendMode = -1;
+        if (g_dbgMode == 1) { glDisable(GL_TEXTURE_2D); s_current.textureId = -99; }
     }
 #endif
 

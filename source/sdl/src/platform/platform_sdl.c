@@ -953,8 +953,14 @@ void platform_gl_swap(void)
             int back = (s_pads[0].ctrl &&
                         SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_BACK)) ? 1 : 0;
             if (back && !s_backPrev) {
-                g_dbgMode = (g_dbgMode + 1) % 9;
-                fprintf(stderr, "DEBUG MODE -> %d (frame %d)\n", g_dbgMode, s_frames);
+                g_dbgMode = (g_dbgMode + 1) % 9;   /* 1=magenta blocks 2=full texture 3=no tests 5-8=viewer */
+                {
+                    extern int g_screenWidth, g_screenHeight, g_screenHeightFull, g_clipLeft, g_clipRight,
+                               g_clipTop, g_clipBottom, g_projScaleXCurrent, g_projScaleY;
+                    fprintf(stderr, "DEBUG MODE -> %d (frame %d) scr=%dx%d full_h=%d clip=%d,%d,%d,%d proj=%d,%d\n",
+                            g_dbgMode, s_frames, g_screenWidth, g_screenHeight, g_screenHeightFull,
+                            g_clipLeft, g_clipTop, g_clipRight, g_clipBottom, g_projScaleXCurrent, g_projScaleY);
+                }
             }
             s_backPrev = back;
         }
