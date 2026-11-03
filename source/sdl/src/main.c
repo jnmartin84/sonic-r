@@ -1754,7 +1754,7 @@ race_start:
             }
             RACE_MARK("before RenderHUD");
 #ifdef SONICR_XBOX
-            { extern unsigned g_dbgTLoop, g_dbgLogicMs, g_dbgTHud; g_dbgTHud = (unsigned)SDL_GetTicks(); g_dbgLogicMs += g_dbgTHud - g_dbgTLoop; }
+            { extern unsigned g_dbgTLoop, g_dbgLogicMs, g_dbgTHud; g_dbgTHud = (unsigned)SDL_GetTicks(); g_dbgLogicMs += g_dbgTHud - g_dbgTLoop; { extern unsigned g_dbgLastLogic; g_dbgLastLogic = g_dbgTHud - g_dbgTLoop; } }
 #endif
             if (g_skipThisFrame == 0) {
                 UpdateFrameTimers();
@@ -1762,7 +1762,7 @@ race_start:
             }
             RACE_MARK("after RenderHUD");
 #ifdef SONICR_XBOX
-            { extern unsigned g_dbgTHud, g_dbgRenderMs; g_dbgRenderMs += (unsigned)SDL_GetTicks() - g_dbgTHud; }
+            { extern unsigned g_dbgTHud, g_dbgRenderMs; g_dbgRenderMs += (unsigned)SDL_GetTicks() - g_dbgTHud; { extern unsigned g_dbgLastRender; g_dbgLastRender = (unsigned)SDL_GetTicks() - g_dbgTHud; } }
 #endif
             g_raceElapsedDisplay = timeGetTime_ms() / 1000 - g_raceTimerDisplayBase;
             UpdateLapCounter(1);

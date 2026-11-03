@@ -917,7 +917,8 @@ void platform_audio_shutdown(void)
 #ifdef SONICR_XBOX
 volatile const char *g_lastMark = "start";
 volatile int g_xbFrames;
-unsigned g_dbgTLoop, g_dbgTHud, g_dbgLogicMs, g_dbgRenderMs;
+unsigned g_dbgTLoop, g_dbgTHud, g_dbgLogicMs, g_dbgRenderMs, g_dbgLastLogic, g_dbgLastRender;
+int g_dbgRainActive, g_dbgRainDrawn, g_dbgRainRejected;
 static unsigned *g_dbgSwapAcc;
 extern int g_dbgMode;
 static int xb_watchdog(void *arg)
@@ -976,6 +977,21 @@ void platform_gl_swap(void)
                         (const char *)g_lastMark);
             s_lastTick = now;
         }
+        {
+            /* Hitch log: which phase of the frame was slow. */
+            static unsigned s_hTick, s_hLogged;
+            static int s_hUp;
+            extern int g_dbgUploadCount;
+            unsigned nowH = (unsigned)SDL_GetTicks();
+            if (s_hTick && nowH - s_hTick > 70 && s_frames > 60 && s_hLogged < 60) {
+                s_hLogged++;
+                fprintf(stderr, "hitch f%d: %u ms (logic %u, render-hud %u, uploads %d, mark %s)\n",
+                        s_frames, nowH - s_hTick, g_dbgLastLogic, g_dbgLastRender,
+                        g_dbgUploadCount - s_hUp, (const char *)g_lastMark);
+            }
+            s_hUp = g_dbgUploadCount;
+            s_hTick = nowH;
+        }
         if (s_frames <= 3 || s_frames % 600 == 0)
             fprintf(stderr, "frame %d\n", s_frames);
         {
@@ -1007,6 +1023,9 @@ void platform_gl_swap(void)
                             nd / 600u, g_dbgBigQuads);
                     g_dbgUploadCount = g_dbgUploadMs = g_dbgUploadMaxMs = g_dbgBigQuads = 0;
                     g_dbgLogicMs = g_dbgRenderMs = 0;
+                    fprintf(stderr, "rain: active-slots/frame %d, drawn/frame %d, rejected/frame %d\n",
+                            g_dbgRainActive / 600, g_dbgRainDrawn / 600, g_dbgRainRejected / 600);
+                    g_dbgRainActive = g_dbgRainDrawn = g_dbgRainRejected = 0;
                 }
                 s_t0 = nowT; s_n50 = s_n80 = s_n120 = s_max = s_swapMs = s_cnt = 0;
                 (void)s_logMs;

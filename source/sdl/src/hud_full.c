@@ -2241,17 +2241,18 @@ void DrawGroundParticlesD3D(int vpIdx)
     R_SetBlendMode(R_BLEND_ALPHA);
     R_SetAlphaTest(1);
     R_SetAlphaRef(0.01f);
-    R_SetDepthTest(1);
-    R_SetDepthFunc(R_DEPTH_LEQUAL);
+    R_SetDepthTest(0);   /* Xbox: ground decals were being rejected by the depth test */
     R_SetDepthWrite(0);
 
     for (int slot = 0; slot < 16; slot++) {
         GroundParticle *gp = &g_particleSlots[slot];
         int tpage = g_tpageParallax1;
+        extern int g_dbgRainActive, g_dbgRainDrawn, g_dbgRainRejected;
 
         if (g_renderStateBlock[slot] == 0) {
             continue;
         }
+        g_dbgRainActive++;
 
         /* Transform 4 vertices: depth check first */
         int dX0 = gp->corners[0].x - g_camIntX;
@@ -2343,10 +2344,12 @@ void DrawGroundParticlesD3D(int vpIdx)
              1.0f / (float)(cz3 + 16), dotColor, 0, 0.875f, vStart + vSize},
         };
         R_DrawQuad(dotVerts);
+        g_dbgRainDrawn++;
 
         goto next;
 
     clearCheck:
+        g_dbgRainRejected++;
         /* Clear slot if owned by current viewport and it failed depth test */
         if (g_particleOwner[slot] == vpIdx) {
             g_renderStateBlock[slot] = 0;
