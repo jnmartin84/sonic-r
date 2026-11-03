@@ -11,6 +11,7 @@
  * game then cannot save.
  */
 #include <hal/xbox.h>
+#include <SDL.h>
 #include <stdio.h>
 #include <windows.h>
 #include <xboxkrnl/xboxkrnl.h>
@@ -31,22 +32,167 @@ void xbox_log_mem(const char *where)
 }
 
 
-/* fopen wrapper: relative paths ("BIN/OPTION/X.RAW", "SAVE/R01.SAV",
- * "SONICR.INF") are taken as relative to D:\\, and '/' becomes '\\'. */
+/* ------------------------------------------------------------------ */
+/* Saves in E:\UDATA\<TitleID>\ like a retail Xbox game                 */
+/* ------------------------------------------------------------------ */
 #include <string.h>
+#include <ctype.h>
+#include <nxdk/mount.h>
+#include "xbox_udata_assets.h"
+
+#define UD_SAVES    "000000000001"   /* SAVE\R01..R08.SAV */
+#define UD_SETTINGS "000000000002"   /* SONICR.INF, JOYSTICK.INF */
+#define UD_GHOSTS   "000000000003"   /* GHOST\... */
+
+static char s_ud[48];      /* "E:\UDATA\53520001" or "" when E: is unavailable */
+
+static void xb_mkdirs(const char *path)
+{
+    char tmp[512];
+    size_t n = strlen(path);
+    if (n >= sizeof(tmp)) return;
+    memcpy(tmp, path, n + 1);
+    for (size_t i = 3; i < n; i++) {
+        if (tmp[i] == '\\') {
+            tmp[i] = 0;
+            CreateDirectoryA(tmp, NULL);
+            tmp[i] = '\\';
+        }
+    }
+    CreateDirectoryA(tmp, NULL);
+}
+
+static int xb_exists(const char *path)
+{
+    return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
+}
+
+static void xb_write_if_missing(const char *path, const void *data, size_t len)
+{
+    if (xb_exists(path)) return;
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    fwrite(data, 1, len, f);
+    fclose(f);
+}
+
+/* UTF-16LE text file with BOM, as the dashboard expects for *.xbx metadata. */
+static void xb_write_meta(const char *path, const char *text)
+{
+    unsigned char buf[256];
+    size_t n = 0;
+    if (xb_exists(path)) return;
+    buf[n++] = 0xFF; buf[n++] = 0xFE;
+    for (; *text && n < sizeof(buf) - 2; text++) { buf[n++] = (unsigned char)*text; buf[n++] = 0; }
+    xb_write_if_missing(path, buf, n);
+}
+
+static void xb_copy_if_missing(const char *src, const char *dst)
+{
+    if (xb_exists(dst) || !xb_exists(src)) return;
+    FILE *in = fopen(src, "rb");
+    if (!in) return;
+    FILE *out = fopen(dst, "wb");
+    if (out) {
+        char b[4096];
+        size_t k;
+        while ((k = fread(b, 1, sizeof(b), in)) > 0) fwrite(b, 1, k, out);
+        fclose(out);
+    }
+    fclose(in);
+}
+
+static void xb_make_save_folder(const char *id, const char *name)
+{
+    char p[160], meta[96];
+    snprintf(p, sizeof(p), "%s\\%s", s_ud, id);
+    xb_mkdirs(p);
+    snprintf(meta, sizeof(meta), "Name=%s\r\n", name);
+    snprintf(p, sizeof(p), "%s\\%s\\SaveMeta.xbx", s_ud, id);
+    xb_write_meta(p, meta);
+    snprintf(p, sizeof(p), "%s\\%s\\saveimage.xbx", s_ud, id);
+    xb_write_if_missing(p, xb_saveimage_xbx, sizeof(xb_saveimage_xbx));
+}
+
+static void xb_udata_init(void)
+{
+    char p[160], q[160];
+    unsigned long tid = (unsigned long)CURRENT_XBE_HEADER->CertificateHeader->TitleID;
+
+    s_ud[0] = 0;
+    if (!nxIsDriveMounted('E') && !nxMountDrive('E', "\\Device\\Harddisk0\\Partition1")) {
+        fprintf(stderr, "UDATA: cannot mount E:, saving next to the game\n");
+        return;
+    }
+    snprintf(s_ud, sizeof(s_ud), "E:\\UDATA\\%08lX", tid);
+    xb_mkdirs(s_ud);
+    if (!xb_exists(s_ud)) {
+        fprintf(stderr, "UDATA: cannot create %s, saving next to the game\n", s_ud);
+        s_ud[0] = 0;
+        return;
+    }
+
+    snprintf(p, sizeof(p), "%s\\TitleMeta.xbx", s_ud);
+    xb_write_meta(p, "TitleName=Sonic R\r\n");
+    snprintf(p, sizeof(p), "%s\\TitleImage.xbx", s_ud);
+    xb_write_if_missing(p, xb_titleimage_xbx, sizeof(xb_titleimage_xbx));
+
+    xb_make_save_folder(UD_SAVES, "Sonic R Race Saves");
+    xb_make_save_folder(UD_SETTINGS, "Sonic R Settings");
+    xb_make_save_folder(UD_GHOSTS, "Sonic R Ghosts");
+
+    /* One-time import of saves made by earlier builds next to the game. */
+    for (int i = 1; i <= 8; i++) {
+        snprintf(p, sizeof(p), "D:\\SAVE\\R0%d.SAV", i);
+        snprintf(q, sizeof(q), "%s\\%s\\SAVE\\R0%d.SAV", s_ud, UD_SAVES, i);
+        if (xb_exists(p) && !xb_exists(q)) {
+            snprintf(q, sizeof(q), "%s\\%s\\SAVE", s_ud, UD_SAVES);
+            xb_mkdirs(q);
+            snprintf(q, sizeof(q), "%s\\%s\\SAVE\\R0%d.SAV", s_ud, UD_SAVES, i);
+            xb_copy_if_missing(p, q);
+        }
+    }
+    snprintf(q, sizeof(q), "%s\\%s\\SONICR.INF", s_ud, UD_SETTINGS);
+    xb_copy_if_missing("D:\\SONICR.INF", q);
+    snprintf(q, sizeof(q), "%s\\%s\\JOYSTICK.INF", s_ud, UD_SETTINGS);
+    xb_copy_if_missing("D:\\JOYSTICK.INF", q);
+    fprintf(stderr, "UDATA: saving to %s\n", s_ud);
+}
+
+/* fopen wrapper: relative paths ("BIN/OPTION/X.RAW") are taken as relative to
+ * D:\, '/' becomes '\'. Save data (SAVE\, SONICR.INF, JOYSTICK.INF, GHOST\)
+ * goes to E:\UDATA\<TitleID>\<folder>\ so the dashboard lists and manages it. */
 FILE *xb_fopen(const char *path, const char *mode)
 {
-    char buf[512];
+    char rel[400], buf[560];
     size_t n = 0;
     if (!path) return NULL;
     while (path[0] == '.' && (path[1] == '/' || path[1] == '\\')) path += 2;
-    if (!strchr(path, ':')) {
-        memcpy(buf, "D:\\", 3);
-        n = 3;
+    if ((path[0] == 'D' || path[0] == 'd') && path[1] == ':') {
+        path += 2;
+        while (*path == '/' || *path == '\\') path++;
     }
-    for (; *path && n < sizeof(buf) - 1; path++)
-        buf[n++] = (*path == '/') ? '\\' : *path;
-    buf[n] = 0;
+    for (; *path && n < sizeof(rel) - 1; path++)
+        rel[n++] = (*path == '/') ? '\\' : *path;
+    rel[n] = 0;
+
+    if (!strchr(rel, ':')) {
+        const char *folder = NULL;
+        if (s_ud[0]) {
+            if (!_strnicmp(rel, "SAVE\\", 5))          folder = UD_SAVES;
+            else if (!_strnicmp(rel, "GHOST\\", 6))    folder = UD_GHOSTS;
+            else if (!_stricmp(rel, "SONICR.INF") || !_stricmp(rel, "JOYSTICK.INF"))
+                                                       folder = UD_SETTINGS;
+        }
+        if (folder) snprintf(buf, sizeof(buf), "%s\\%s\\%s", s_ud, folder, rel);
+        else        snprintf(buf, sizeof(buf), "D:\\%s", rel);
+    } else {
+        snprintf(buf, sizeof(buf), "%s", rel);
+    }
+    if (mode && (strchr(mode, 'w') || strchr(mode, 'a'))) {
+        char *sl = strrchr(buf, '\\');
+        if (sl) { *sl = 0; xb_mkdirs(buf); *sl = '\\'; }
+    }
     return fopen(buf, mode);
 }
 
@@ -98,17 +244,23 @@ static void xbox_install_exception_handler(void)
 int main(void)
 {
     static char *argv[] = { "SONICR.XBE", 0 };
-    CreateDirectoryA("D:\\SAVE", NULL);
-    CreateDirectoryA("D:\\GHOST", NULL);
     /* The Xbox has no console: send stderr to D:\SONICR.LOG, unbuffered so the
      * last lines survive a crash. If D: is read-only this is silently skipped. */
     if (freopen("D:\\SONICR.LOG", "w", stderr)) {
         setvbuf(stderr, NULL, _IONBF, 0);
         fprintf(stderr, "Sonic R Xbox: started\n");
     }
+    xb_udata_init();
     xbox_install_exception_handler();
     xbox_log_mem("start");
     sonicr_main(1, argv);
+    /* Leave cleanly: flush the log, stop the audio hardware, then hand control
+     * back to the dashboard (rebooting with the AC97 still running left the
+     * dashboard with crackling sound / a muted game on the next start). */
+    fprintf(stderr, "exit: returning to dashboard\n");
+    fflush(stderr);
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    XLaunchXBE(NULL);
     XReboot();
     return 0;
 }
