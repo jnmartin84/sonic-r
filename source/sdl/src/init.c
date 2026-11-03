@@ -259,7 +259,15 @@ void LoadGameState(void)
     /* Far clip bounds + quality — binary sets these at 0x4CD8xx after InitDefaultTimeTables.
      * g_clipFar = 0x3FF, g_clipNear = 0xFF, g_maxPolyCount = 0x2800.
      * g_qualityLevel defaults to 4 (highest) for D3D hardware. */
+#ifdef SONICR_XBOX
+    /* The menu's five Draw Distance steps interpolate between g_clipNear and
+     * g_clipFar. The PC maximum is 0x3FF; here the top step goes a quarter
+     * further (0x4FF) so "Far" equals the PC's farthest and "Very Far" beats
+     * it. Cull distance, depth scale and the alpha fade all follow this value. */
+    g_clipFar = 0x4FF;
+#else
     g_clipFar = 0x3FF; /* binary: 0x3FF; increase for extended draw distance */
+#endif
     g_clipNear = 0xFF;
     g_maxPolyCount = 0x2800;
     g_qualityLevel = 4;

@@ -343,7 +343,7 @@ int main(void)
      * silently skipped. */
     if (freopen("D:\\SONICR.LOG", "w", stderr)) {
         setvbuf(stderr, NULL, _IOFBF, 64 * 1024);
-        fprintf(stderr, "Sonic R Xbox: started\n");
+        fprintf(stderr, "Sonic R Xbox: started, build %s %s\n", __DATE__, __TIME__);
     }
     xb_udata_init();
     atexit(xb_exit_cleanup);
