@@ -2306,6 +2306,15 @@ void DrawGroundParticlesD3D(int vpIdx)
         int sx3 = g_screenCenterX + (g_projScaleXCurrent * cx) / cz3;
         int sy3 = g_screenCenterY - (g_projScaleY * cy) / cz3;
 
+        {
+            static int s_rl;
+            if (s_rl < 8) {
+                s_rl++;
+                fprintf(stderr, "ripple slot %d: cz=%d s0=(%d,%d) s2=(%d,%d) clip=%d,%d,%d,%d cam=%d,%d,%d w=%d,%d,%d\n", slot, cz0, sx0, sy0, sx2, sy2,
+                        g_clipLeft, g_clipTop, g_clipRight, g_clipBottom, g_camIntX, g_camIntY, g_camIntZ,
+                        gp->corners[0].x, gp->corners[0].z, g_particleAge[slot]);
+            }
+        }
         /* Viewport clip test */
         if (!(g_clipLeft <= sx0 || g_clipLeft <= sx1 || g_clipLeft <= sx2 || g_clipLeft <= sx3)) {
             goto next;

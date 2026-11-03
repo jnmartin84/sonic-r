@@ -942,6 +942,29 @@ static int xb_watchdog(void *arg)
 void xbox_start_watchdog(void) { SDL_CreateThread(xb_watchdog, "watchdog", NULL); }
 #endif
 
+
+/* Buffered diagnostics: unbuffered fprintf to the HDD stalls a frame by ~150 ms,
+ * which showed up as periodic hitches. Collect lines in RAM and write them out
+ * only at a natural pause (loading/menus) or when the buffer fills. */
+#include <stdarg.h>
+static char s_xbLog[12288];
+static int s_xbLogLen;
+static void xb_log_flush(void)
+{
+    if (s_xbLogLen) { s_xbLog[s_xbLogLen] = 0; fputs(s_xbLog, stderr); s_xbLogLen = 0; }
+}
+static void xb_logf(const char *fmt, ...)
+{
+    va_list ap;
+    int n;
+    if (s_xbLogLen > (int)sizeof(s_xbLog) - 600) xb_log_flush();
+    va_start(ap, fmt);
+    n = vsnprintf(s_xbLog + s_xbLogLen, sizeof(s_xbLog) - 1 - s_xbLogLen, fmt, ap);
+    va_end(ap);
+    if (n > 0) s_xbLogLen += n;
+    if (s_xbLogLen > (int)sizeof(s_xbLog) - 1) s_xbLogLen = (int)sizeof(s_xbLog) - 1;
+}
+
 void platform_gl_swap(void)
 {
 #ifdef SONICR_XBOX
@@ -973,7 +996,7 @@ void platform_gl_swap(void)
             static unsigned s_lastTick;
             unsigned now = (unsigned)SDL_GetTicks();
             if (s_lastTick && now - s_lastTick > 150 && s_frames > 30)
-                fprintf(stderr, "slow frame %d: %u ms (mark: %s)\n", s_frames, now - s_lastTick,
+                xb_logf("slow frame %d: %u ms (mark: %s)\n", s_frames, now - s_lastTick,
                         (const char *)g_lastMark);
             s_lastTick = now;
         }
@@ -985,15 +1008,16 @@ void platform_gl_swap(void)
             unsigned nowH = (unsigned)SDL_GetTicks();
             if (s_hTick && nowH - s_hTick > 70 && s_frames > 60 && s_hLogged < 60) {
                 s_hLogged++;
-                fprintf(stderr, "hitch f%d: %u ms (logic %u, render-hud %u, uploads %d, mark %s)\n",
+                xb_logf("hitch f%d: %u ms (logic %u, render-hud %u, uploads %d, mark %s)\n",
                         s_frames, nowH - s_hTick, g_dbgLastLogic, g_dbgLastRender,
                         g_dbgUploadCount - s_hUp, (const char *)g_lastMark);
             }
+            if (s_hTick && nowH - s_hTick > 400) xb_log_flush();
             s_hUp = g_dbgUploadCount;
             s_hTick = nowH;
         }
         if (s_frames <= 3 || s_frames % 600 == 0)
-            fprintf(stderr, "frame %d\n", s_frames);
+            xb_logf("frame %d\n", s_frames);
         {
             /* Frame-time statistics, printed together once per 600 frames. */
             static unsigned s_t0, s_tPrev, s_n50, s_n80, s_n120, s_max, s_swapMs, s_cnt;
@@ -1011,19 +1035,19 @@ void platform_gl_swap(void)
             if (!s_t0) s_t0 = nowT;
             if (s_frames % 600 == 0) {
                 unsigned span = nowT - s_t0;
-                fprintf(stderr, "timing: %u frames in %u ms (avg %u.%u ms), >50ms:%u >80ms:%u >120ms:%u max:%u ms, swap-wait avg %u us\n",
+                xb_logf("timing: %u frames in %u ms (avg %u.%u ms), >50ms:%u >80ms:%u >120ms:%u max:%u ms, swap-wait avg %u us\n",
                         s_cnt, span, s_cnt ? span / s_cnt : 0, s_cnt ? (span * 10 / s_cnt) % 10 : 0,
                         s_n50, s_n80, s_n120, s_max, s_cnt ? s_swapMs * 1000u / s_cnt : 0);
                 {
                     extern int g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs, g_dbgBigQuads, g_dbgDraws[53];
                     unsigned nd = 0;
                     for (int t = 0; t < 53; t++) nd += (unsigned)g_dbgDraws[t];
-                    fprintf(stderr, "timing2: logic %u ms, render %u ms (race frames, sum); uploads %d (%d ms, max %d ms); draws/frame %u; big-quads %d\n",
+                    xb_logf("timing2: logic %u ms, render %u ms (race frames, sum); uploads %d (%d ms, max %d ms); draws/frame %u; big-quads %d\n",
                             g_dbgLogicMs, g_dbgRenderMs, g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs,
                             nd / 600u, g_dbgBigQuads);
                     g_dbgUploadCount = g_dbgUploadMs = g_dbgUploadMaxMs = g_dbgBigQuads = 0;
                     g_dbgLogicMs = g_dbgRenderMs = 0;
-                    fprintf(stderr, "rain: active-slots/frame %d, drawn/frame %d, rejected/frame %d\n",
+                    xb_logf("rain: active-slots/frame %d, drawn/frame %d, rejected/frame %d\n",
                             g_dbgRainActive / 600, g_dbgRainDrawn / 600, g_dbgRainRejected / 600);
                     g_dbgRainActive = g_dbgRainDrawn = g_dbgRainRejected = 0;
                 }

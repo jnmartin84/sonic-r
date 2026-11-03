@@ -768,6 +768,9 @@ void DrawSnowParticles(int viewportIdx)
     R_PushState();
     R_SetBlendMode(R_BLEND_ADDITIVE);
     R_SetDepthWrite(0);
+#ifdef SONICR_XBOX
+    R_SetDepthTest(0);   /* drops were cut off by the track surface before reaching the ground */
+#endif
     R_SetTexEnv(R_TEXENV_MODULATE);
 
     if (g_netSessionActive != 0) {
