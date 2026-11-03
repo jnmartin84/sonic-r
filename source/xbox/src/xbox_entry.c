@@ -13,6 +13,7 @@
 #include <hal/xbox.h>
 #include <SDL.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <windows.h>
 #include <xboxkrnl/xboxkrnl.h>
 
@@ -317,6 +318,20 @@ static void xb_ac97_shutdown(void)
     fprintf(stderr, "exit: audio hardware idle\n");
 }
 
+/* The game leaves through exit(0) (shutdown.c, SDL_QUIT), which never returns
+ * to main(). nxdk's exit() ends in a *quick* reboot that does not reset the
+ * audio hardware, leaving the console silent until a power cycle. So hook exit:
+ * idle the AC97, then do a full reset (the same as "restart" from the dashboard). */
+static void xb_exit_cleanup(void)
+{
+    fprintf(stderr, "exit: idling audio, full reboot\n");
+    fflush(stderr);
+    xb_ac97_shutdown();
+    SDL_Delay(200);
+    XReboot();   /* HalRebootRoutine: full SMC reset */
+    for (;;) { }
+}
+
 int main(void)
 {
     static char *argv[] = { "SONICR.XBE", 0 };
@@ -327,6 +342,7 @@ int main(void)
         fprintf(stderr, "Sonic R Xbox: started\n");
     }
     xb_udata_init();
+    atexit(xb_exit_cleanup);
     xbox_install_exception_handler();
     xbox_log_mem("start");
     sonicr_main(1, argv);
