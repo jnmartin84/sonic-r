@@ -423,6 +423,13 @@ void R_DebugGetState(int *depthTest, int *depthWrite, int *depthFunc,
     if (alphaRef)   *alphaRef   = s_desired.alphaRef;
 }
 
+#ifdef SONICR_XBOX
+void R_InvalidateBoundTexture(void)
+{
+    s_current.textureId = -99;   /* force the next flush to glEnable+glBindTexture */
+}
+#endif
+
 void R_ResetState(void)
 {
     s_desired = s_defaults;

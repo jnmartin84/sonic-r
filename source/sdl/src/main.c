@@ -1310,6 +1310,9 @@ race_start:
     g_raceStateCounter0 = 0;
     g_raceStateCounter1 = 0;
     DebugLog("MAIN GAME LOOP\n");
+#ifdef SONICR_XBOX
+    { extern void GL_PreuploadAll(void); GL_PreuploadAll(); }
+#endif
     g_splashCountdown = 2;
     g_renderPass = 2;
     g_netWaitFlag = 0;

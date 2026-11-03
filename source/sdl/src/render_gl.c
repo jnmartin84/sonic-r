@@ -124,7 +124,7 @@ void GL_InitTextures(void)
  * Tpage pixel data is 16bpp (RGB565).
  * Standard tpages are 256x256. Wallpaper tpages may be 640x480.
  */
-void GL_UploadTpage(int tpage)
+static void GL_UploadTpageImpl(int tpage)
 {
     if (!s_glTexturesInited) {
         GL_InitTextures();
@@ -284,11 +284,34 @@ void GL_UploadTpage(int tpage)
      * Need to understand the full tpage lifecycle before enabling. */
 }
 
+#ifdef SONICR_XBOX
+extern void R_InvalidateBoundTexture(void);
+int g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs;
+#endif
+void GL_UploadTpage(int tpage)
+{
+#ifdef SONICR_XBOX
+    unsigned t0 = (unsigned)SDL_GetTicks();
+#endif
+    GL_UploadTpageImpl(tpage);
+#ifdef SONICR_XBOX
+    {
+        int dt = (int)((unsigned)SDL_GetTicks() - t0);
+        g_dbgUploadCount++;
+        g_dbgUploadMs += dt;
+        if (dt > g_dbgUploadMaxMs) g_dbgUploadMaxMs = dt;
+    }
+    /* The upload bound this tpage's texture behind the backend's back; make
+     * the next draw re-bind instead of trusting a stale cached binding. */
+    R_InvalidateBoundTexture();
+#endif
+}
+
 /**
  * GL_UploadTpageRGBA — upload pre-built RGBA data directly to a tpage's GL texture.
  * Bypasses the 16bpp pixel buffer entirely for full-quality tinted backgrounds.
  */
-void GL_UploadTpageRGBA(int tpage, unsigned char *rgba, int w, int h)
+static void GL_UploadTpageRGBAImpl(int tpage, unsigned char *rgba, int w, int h)
 {
     if (!s_glTexturesInited) {
         GL_InitTextures();
@@ -301,6 +324,14 @@ void GL_UploadTpageRGBA(int tpage, unsigned char *rgba, int w, int h)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, rgba);
     s_glTextureDirty[tpage] = 0;
+}
+
+void GL_UploadTpageRGBA(int tpage, unsigned char *rgba, int w, int h)
+{
+    GL_UploadTpageRGBAImpl(tpage, rgba, w, h);
+#ifdef SONICR_XBOX
+    R_InvalidateBoundTexture();
+#endif
 }
 
 /**
@@ -360,7 +391,7 @@ void GL_ClearTpageDirty(int tpage)
  * Used for minimap MAP textures which are loaded as sub-rects after the
  * ICON01 freeze.
  */
-void GL_UploadTpageSubRect(int tpage, int destX, int destY, int width, int height)
+static void GL_UploadTpageSubRectImpl(int tpage, int destX, int destY, int width, int height)
 {
     if (!s_glTexturesInited) {
         GL_InitTextures();
@@ -414,6 +445,14 @@ void GL_UploadTpageSubRect(int tpage, int destX, int destY, int width, int heigh
     }
     glTexSubImage2D(GL_TEXTURE_2D, 0, destX, destY, width, height,
                     GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, out);
+#endif
+}
+
+void GL_UploadTpageSubRect(int tpage, int destX, int destY, int width, int height)
+{
+    GL_UploadTpageSubRectImpl(tpage, destX, destY, width, height);
+#ifdef SONICR_XBOX
+    R_InvalidateBoundTexture();
 #endif
 }
 
@@ -1194,5 +1233,21 @@ void GL_DebugViewTpage(int tp, int x, int y, int size)
     glTexCoord2f(0.0f, 1.0f); glVertex2f((float)x, (float)(y + size));
     glEnd();
     R_ResetState();
+}
+#endif
+
+#ifdef SONICR_XBOX
+/* Upload every loaded-but-not-yet-uploaded tpage now (e.g. while the track
+ * loads) so the conversion work does not land in the middle of a race. */
+void GL_PreuploadAll(void)
+{
+    if (!s_glTexturesInited) {
+        GL_InitTextures();
+    }
+    for (int tp = 0; tp < 52; tp++) {
+        if (g_tpagePixelBuf[tp] != NULL && s_glTextureDirty[tp]) {
+            GL_UploadTpage(tp);
+        }
+    }
 }
 #endif
