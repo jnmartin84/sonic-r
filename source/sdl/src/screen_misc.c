@@ -376,7 +376,11 @@ static const int s_optItemInfo[][5] = {
     {2, 128, 128, 136, 1}, /* 26: g_qualityLevel (0-4) */
     {2, 128, 144, 136, 1}, /* 27: g_resolutionLevel (0-4) */
     {2, 128, 160, 136, 1}, /* 28: g_emeraldRenderFlag */
+#ifdef SONICR_XBOX
+    {2, 128, 128, 136, 1}, /* 29: Xbox — Draw Distance, moved here so it sits right above Back */
+#else
     {1, 0, 208, 136, 1},   /* 29: g_optCfg_470 */
+#endif
     {1, 128, 176, 136, 0}, /* 30: back (no value) */
     /* Items 31-36 */
     {1, 0, 192, 136, 1},   /* 31: exit confirm */
@@ -429,7 +433,15 @@ static const int s_optPageItems[7][2] = {
     {  0,  7 },   /* 0: main options list */
     {  8, 15 },   /* 1: Game */
     { 16, 22 },   /* 2: Sound */
+#ifdef SONICR_XBOX
+    { 29, 30 },   /* 3: Graphics — Draw Distance (item 29 here) + Back */
+#else
+#ifdef SONICR_XBOX
+    { 29, 30 },   /* 3: Graphics — Draw Distance (shown as item 29) + Back */
+#else
     { 23, 30 },   /* 3: Graphics */
+#endif
+#endif
     { 99, 99 },   /* 4: unused */
     { 31, 31 },   /* 5: Exit to Windows confirm (YES/NO) */
 #ifdef SONICR_XBOX
@@ -635,7 +647,11 @@ static int IsDisabledGraphicsItem(int itemIndex)
         case 25:
         case 27:
         case 28:
+#ifdef SONICR_XBOX
+        case 26:   /* Draw Distance lives in slot 29 on this build */
+#else
         case 29:
+#endif
             return 1;
         default:
             return 0;
@@ -707,6 +723,11 @@ static void DrawOptionItem(int xPos, int itemIndex)
 
     if (itemIndex >= 8 && itemIndex <= 31) {
         int idx = itemIndex - 8;
+#ifdef SONICR_XBOX
+        if (itemIndex == 29) {
+            idx = 26 - 8;   /* Draw Distance value */
+        }
+#endif
         switch (idx) {
             case 0: /* item 8: g_difficultyConfig — 3 states */
                 value = g_difficultyConfig;
@@ -1359,6 +1380,11 @@ int OptionsMenuScreen(void)
                 if (IsDisabledGraphicsItem(item)) {
                     item = -1;
                 }
+#ifdef SONICR_XBOX
+                else if (item == 29) {
+                    item = 26;   /* slot 29 carries Draw Distance */
+                }
+#endif
 
                 /* Only items 8-31 have adjustable values */
                 if (item >= 8 && item <= 31) {
