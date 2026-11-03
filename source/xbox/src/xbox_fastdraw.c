@@ -23,6 +23,13 @@
 static uint32_t *s_p;
 static int s_open;
 
+/* Start of the push buffer (set by the frame swap code after pb_reset).
+ * pbkit has no wrap: a frame writing more than the 512 KB buffer runs past its
+ * end and corrupts whatever memory follows (textures, geometry). Reset mid-frame
+ * (GPU drains, then jumps back to head) when the buffer gets 3/4 full. */
+uint32_t *xb_pb_head;
+#define XB_PB_LIMIT_DWORDS (96 * 1024)
+
 void xb_batch_end(void)
 {
     if (s_open) {
@@ -34,9 +41,19 @@ void xb_batch_end(void)
 /* verts: n entries of {x, y, z, w, r, g, b, a, u, v} (x,y,z already multiplied by w) */
 void xb_draw_fan(const float *verts, int n)
 {
+    if (s_open && xb_pb_head && (s_p - xb_pb_head) > XB_PB_LIMIT_DWORDS) {
+        pb_end(s_p);
+        s_open = 0;
+        pb_reset();
+    }
     if (!s_open) {
         pbgl_state_flush();
         s_p = pb_begin();
+        if (xb_pb_head && (s_p - xb_pb_head) > XB_PB_LIMIT_DWORDS) {
+            pb_end(s_p);
+            pb_reset();
+            s_p = pb_begin();
+        }
         s_open = 1;
     }
 

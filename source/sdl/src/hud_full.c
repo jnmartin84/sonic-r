@@ -2222,6 +2222,11 @@ void DrawPickupShadows(void)
  * Slots with g_renderStateBlock[slot] == 0 are skipped (inactive).
  * Slots that fail depth/clip tests are cleared if owned by current viewport.
  */
+#ifdef SONICR_XBOX
+#define XB_RZ(c) ((c) > 140 ? (c) - 96 : (c) / 2)
+#else
+#define XB_RZ(c) ((c) > 40 ? (c) - 24 : 16)
+#endif
 void DrawGroundParticlesD3D(int vpIdx)
 {
     if (g_tpageStateArray[g_tpageParallax1] != 4) {
@@ -2241,7 +2246,13 @@ void DrawGroundParticlesD3D(int vpIdx)
     R_SetBlendMode(R_BLEND_ALPHA);
     R_SetAlphaTest(1);
     R_SetAlphaRef(0.01f);
-    R_SetDepthTest(0);   /* Xbox: ground decals were being rejected by the depth test */
+#ifdef SONICR_XBOX
+    /* Depth test on so asphalt/track geometry hides the ripples; the decal is
+     * pulled towards the camera (see XB_RIPPLE_BIAS) to avoid z-fighting. */
+    R_SetDepthTest(1);
+#else
+    R_SetDepthTest(0);
+#endif
     R_SetDepthWrite(0);
 
     for (int slot = 0; slot < 16; slot++) {
@@ -2343,13 +2354,13 @@ void DrawGroundParticlesD3D(int vpIdx)
         R_SetTexEnv(R_TEXENV_MODULATE);
 
         RenderVertex dotVerts[4] = {
-            {(float)sx0, (float)sy0, (float)((cz0 > 40 ? cz0 - 24 : 16)) * invDepthScale,
+            {(float)sx0, (float)sy0, (float)XB_RZ(cz0) * invDepthScale,
              1.0f / (float)(cz0 + 16), dotColor, 0, 0.875f, vStart},
-            {(float)sx1, (float)sy1, (float)((cz1 > 40 ? cz1 - 24 : 16)) * invDepthScale,
+            {(float)sx1, (float)sy1, (float)XB_RZ(cz1) * invDepthScale,
              1.0f / (float)(cz1 + 16), dotColor, 0, 1.0f, vStart},
-            {(float)sx2, (float)sy2, (float)((cz2 > 40 ? cz2 - 24 : 16)) * invDepthScale,
+            {(float)sx2, (float)sy2, (float)XB_RZ(cz2) * invDepthScale,
              1.0f / (float)(cz2 + 16), dotColor, 0, 1.0f, vStart + vSize},
-            {(float)sx3, (float)sy3, (float)((cz3 > 40 ? cz3 - 24 : 16)) * invDepthScale,
+            {(float)sx3, (float)sy3, (float)XB_RZ(cz3) * invDepthScale,
              1.0f / (float)(cz3 + 16), dotColor, 0, 0.875f, vStart + vSize},
         };
         R_DrawQuad(dotVerts);

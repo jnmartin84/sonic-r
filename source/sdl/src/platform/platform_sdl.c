@@ -1115,6 +1115,7 @@ void platform_gl_swap(void)
     }
     {
         /* Track how much push buffer a frame uses (dwords); log new maxima. */
+        extern uint32_t *xb_pb_head;
         static uint32_t *s_pbStart;
         static unsigned s_pbMax;
         uint32_t *cur = pb_begin();
@@ -1133,6 +1134,7 @@ void platform_gl_swap(void)
         }
         s_pbStart = pb_begin();
         pb_end(s_pbStart);
+        xb_pb_head = s_pbStart;
     }
     return;
 #endif
