@@ -131,8 +131,8 @@ image pillarboxed in the middle; otherwise it falls back to 640x480.
   `SONICR.LOG` shows the free memory at several points.
 - Rendering relies on pbgl's fixed-function path; any texture or blend mode it
   does not implement will look wrong rather than crash.
-- Known visual bug: a texture (the "dog") that sometimes disappears. Under
-  investigation.
+- Small seams can show at the joins of the background strips; the retail PC
+  version has them too.
 - Fixed: the black/blue flashes (a dark rectangle, mostly over the lower half of
   the picture, every few seconds, even while paused). pbkit's triple buffering
   can lose a flip when the frame-ready interrupt and a VBlank are serviced in
