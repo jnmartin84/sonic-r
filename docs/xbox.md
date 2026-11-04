@@ -129,7 +129,11 @@ UDP directly between the consoles/PCs, with UPnP to open the host's port.
   `E:\UDATA\<TitleID>\` with the settings, so later launches skip this step.
 - **Lobby buttons:** A / Start host or start the race, right trigger join, Y
   LAN-only, left trigger change mode, D-pad left/right character, D-pad up/down
-  track, B back.
+  track, B back. The on-screen hints show these Xbox buttons: the PC key names
+  painted into `NET00.RAW` are replaced when the file is loaded (a patched copy
+  is written to UDATA; `source/xbox/tools/make_net00_patch.py` builds the
+  patch). There is no typed lobby chat (no keyboard). The host needs at least
+  one other player to start a race.
 - The console registers as platform `xbox`.
 
 Under the hood: nxdk's lwIP provides the BSD socket API through small shim

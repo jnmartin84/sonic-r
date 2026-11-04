@@ -216,6 +216,37 @@ static void xb_udata_init(void)
  * D:\, '/' becomes '\'. Save data (SAVE\, SONICR.INF, JOYSTICK.INF, GHOST\)
  * goes to E:\UDATA\<TitleID>\<folder>\ so the dashboard lists and manages it.
  * ONLINE.DAT (the online sign-in token) is kept with the settings. */
+#include "xbox_net00_patch.h"
+
+/* The network screens' key hints (F1, F2, Esc ...) are painted into
+ * BIN\OPTION\NET00.RAW. Serve a copy with Xbox button names instead: read the
+ * original, apply the pixel runs from tools/make_net00_patch.py, write it to
+ * the title's UDATA folder and open that. The game data is left untouched. */
+static FILE *xb_open_net00(const char *orig)
+{
+    static unsigned char buf[256 * 256 * 3];
+    char out[96];
+    if (!s_ud[0]) return NULL;
+    FILE *f = fopen(orig, "rb");
+    if (!f) return NULL;
+    size_t n = fread(buf, 1, sizeof(buf), f);
+    fclose(f);
+    if (n != sizeof(buf)) return NULL;
+    const unsigned char *px = xb_net00_pixels;
+    for (int i = 0; i < XB_NET00_RUNS; i++) {
+        size_t off = ((size_t)xb_net00_runs[i][1] * 256 + xb_net00_runs[i][0]) * 3;
+        size_t len = (size_t)xb_net00_runs[i][2] * 3;
+        memcpy(buf + off, px, len);
+        px += len;
+    }
+    snprintf(out, sizeof(out), "%s\\NET00X.RAW", s_ud);
+    f = fopen(out, "wb");
+    if (!f) return NULL;
+    fwrite(buf, 1, sizeof(buf), f);
+    fclose(f);
+    return fopen(out, "rb");
+}
+
 FILE *xb_fopen(const char *path, const char *mode)
 {
     char rel[400], buf[560];
@@ -243,6 +274,10 @@ FILE *xb_fopen(const char *path, const char *mode)
         else        snprintf(buf, sizeof(buf), "D:\\%s", rel);
     } else {
         snprintf(buf, sizeof(buf), "%s", rel);
+    }
+    if (mode && mode[0] == 'r' && !_stricmp(rel, "BIN\\OPTION\\NET00.RAW")) {
+        FILE *pf = xb_open_net00(buf);
+        if (pf) return pf;
     }
     if (mode && (strchr(mode, 'w') || strchr(mode, 'a'))) {
         char *sl = strrchr(buf, '\\');
