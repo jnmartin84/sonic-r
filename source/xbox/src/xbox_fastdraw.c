@@ -38,6 +38,23 @@ static void xb_pb_note(void)
 }
 #define XB_PB_LIMIT_DWORDS (768 * 1024)
 
+/* Flash-hunt experiments on GPU depth state (pbgl turns Z compression on and
+ * culls vertices outside near/far; both are suspects for whole viewports
+ * randomly vanishing).
+ *   0 = pbgl defaults, 1 = Z compression off, 2 = near/far clamp instead of cull,
+ *   3 = both. */
+void xb_batch_end(void);
+int xb_gpu_exp;
+void xb_gpu_experiment(int e)
+{
+    xb_batch_end();
+    xb_gpu_exp = e;
+    uint32_t *p = pb_begin();
+    p = push_command_boolean(p, NV097_SET_COMPRESS_ZBUFFER_EN, (e & 1) ? false : true);
+    p = push_command_parameter(p, NV097_SET_ZMIN_MAX_CONTROL, (e & 2) ? 0x10u : 0x1u);
+    pb_end(p);
+}
+
 void xb_batch_end(void)
 {
     if (s_open) {
