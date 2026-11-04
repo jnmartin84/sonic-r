@@ -972,6 +972,7 @@ static void xb_logf(const char *fmt, ...)
     if (s_xbLogLen > (int)sizeof(s_xbLog) - 1) s_xbLogLen = (int)sizeof(s_xbLog) - 1;
 }
 
+static unsigned s_dhist[64];   /* draws per frame, indexed by frame & 63 */
 #ifdef SONICR_XBOX
 /* Timestamped event note for the log (first 80), used to line events up with
  * what is seen on screen. */
@@ -1047,6 +1048,12 @@ void platform_gl_swap(void)
             if (mk && !s_mkPrev && s_mkN < 200) {
                 s_mkN++;
                 xb_logf("FLASHMARK #%d at frame %d, %u ms\n", s_mkN, s_frames, (unsigned)SDL_GetTicks());
+                {
+                    int k;
+                    xb_logf("  draws/frame, last 40 frames (oldest first):");
+                    for (k = 40; k >= 1; k--) xb_logf(" %u", s_dhist[(s_frames - k) & 63]);
+                    xb_logf("\n");
+                }
             }
             s_mkPrev = mk;
         }
@@ -1092,18 +1099,31 @@ void platform_gl_swap(void)
             /* A frame with far fewer draws than usual is a likely "black flash". */
             extern int g_dbgDraws[53];
             static unsigned s_prevSum, s_avg, s_lastLow;
+            static unsigned s_prevT[53], s_goodT[53];
+            unsigned curT[53];
             unsigned sum = 0;
-            for (int t = 0; t < 53; t++) sum += (unsigned)g_dbgDraws[t];
+            for (int t = 0; t < 53; t++) { sum += (unsigned)g_dbgDraws[t]; curT[t] = (unsigned)g_dbgDraws[t] - s_prevT[t]; }
             if (s_frames % 600 != 1 && sum >= s_prevSum) {
                 unsigned d = sum - s_prevSum;
+                s_dhist[s_frames & 63] = d;
                 if (s_frames > 200 && s_avg > 300 && d * 3 < s_avg) {
-                    xb_logf("LOWDRAW frame %d: %u draws (avg %u), %u ms since last, mark %s\n", s_frames, d, s_avg,
-                            (unsigned)SDL_GetTicks() - s_lastLow, (const char *)g_lastMark);
-                    s_lastLow = (unsigned)SDL_GetTicks();
+                    static int s_lowN;
+                    if (++s_lowN <= 60) {
+                        xb_logf("LOWDRAW frame %d: %u draws (avg %u), mark %s; tpage good->now:", s_frames, d, s_avg,
+                                (const char *)g_lastMark);
+                        for (int t = 0; t < 53; t++)
+                            if (s_goodT[t] > curT[t] + 20) xb_logf(" %d:%u->%u", t, s_goodT[t], curT[t]);
+                        xb_logf("\n");
+                    }
+                }
+                else {
+                    for (int t = 0; t < 53; t++) s_goodT[t] = curT[t];
                 }
                 s_avg = s_avg ? (s_avg * 15 + d) / 16 : d;
             }
+            for (int t = 0; t < 53; t++) s_prevT[t] = (unsigned)g_dbgDraws[t];
             s_prevSum = sum;
+            (void)s_lastLow;
         }
         if (s_frames <= 3 || s_frames % 600 == 0)
             xb_logf("frame %d\n", s_frames);
