@@ -1012,6 +1012,7 @@ void platform_gl_swap(void)
             }
             s_igrHeld = combo ? s_igrHeld + 1 : 0;
             if (s_igrHeld >= 15) {
+                xb_log_flush();   /* write out the buffered diagnostics first */
                 fprintf(stderr, "IGR: reset requested\n");
                 fflush(stderr);
                 exit(0);   /* atexit handler idles the audio and does the full reboot */
@@ -1038,6 +1039,18 @@ void platform_gl_swap(void)
             s_backPrev = back;
         }
         {
+            /* Y + Back: mark "I just saw a flash" in the log (frame + time). */
+            static int s_mkPrev, s_mkN;
+            int mk = (s_pads[0].ctrl &&
+                      SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_BACK) &&
+                      SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_Y)) ? 1 : 0;
+            if (mk && !s_mkPrev && s_mkN < 200) {
+                s_mkN++;
+                xb_logf("FLASHMARK #%d at frame %d, %u ms\n", s_mkN, s_frames, (unsigned)SDL_GetTicks());
+            }
+            s_mkPrev = mk;
+        }
+        {
             /* RB + Back: pause/resume the music (black-flash test: is it the audio?). */
             static int s_muPrev, s_muOff;
             int mu = (s_pads[0].ctrl &&
@@ -1046,7 +1059,7 @@ void platform_gl_swap(void)
             if (mu && !s_muPrev) {
                 s_muOff = !s_muOff;
                 { extern int xb_musicPaused; xb_musicPaused = s_muOff; }
-                fprintf(stderr, "MUSIC %s (frame %d)\n", s_muOff ? "PAUSED" : "RESUMED", s_frames);
+                xb_logf("MUSIC %s (frame %d)\n", s_muOff ? "PAUSED" : "RESUMED", s_frames);
             }
             s_muPrev = mu;
         }
