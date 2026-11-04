@@ -514,6 +514,7 @@ float g_dbgVert[53][6];
  * exact for what is visible.
  */
 int g_dbgClipped;
+int g_dbgWideW;
 typedef struct { float x, y, z, rhw, uw, vw, a, r, g, b; } XbClipV;
 
 static int xb_clip_edge(const XbClipV *in, int n, XbClipV *out, int axis, float lim, int keepGreater)
@@ -593,16 +594,44 @@ void R_DrawTriFan(const RenderVertex *v, int count)
 
     R_FlushState();
 #ifdef SONICR_XBOX
+    if (g_dbgMode == 4 && (s_desired.textureId == 16 || s_desired.textureId == 17)) {
+        return;   /* debug mode 4: hide the playfield grid tiles (tpages 16/17) */
+    }
+    {
+        /* Polygons whose 1/w varies a lot across the face (near-camera floor):
+         * the GPU's perspective interpolation loses precision there. */
+        float mn = 1e30f, mx = 0.0f;
+        for (int i = 0; i < count; i++) {
+            if (v[i].rhw > 0.0f) {
+                if (v[i].rhw < mn) mn = v[i].rhw;
+                if (v[i].rhw > mx) mx = v[i].rhw;
+            }
+        }
+        if (mx > 0.0f && mx > mn * 40.0f) {
+            static int s_wideLog, s_wideAll;
+            g_dbgWideW++;
+            if (s_wideLog < 40 && (s_wideAll++ % 400) == 0) {   /* sampled across the run */
+                s_wideLog++;
+                fprintf(stderr, "widew tpage %d n=%d ratio=%d:", s_desired.textureId, count, (int)(mx / mn));
+                for (int k = 0; k < count && k < 4; k++)
+                    fprintf(stderr, " (%d,%d w=%d uv*100=%d,%d)", (int)v[k].sx, (int)v[k].sy,
+                            v[k].rhw > 0.0f ? (int)(1.0f / v[k].rhw) : -1,
+                            (int)(v[k].u * 100.0f), (int)(v[k].v * 100.0f));
+                fprintf(stderr, "\n");
+            }
+        }
+    }
     for (int i = 0; i < count; i++) {
         if (v[i].sx < -2000.0f || v[i].sx > 2640.0f || v[i].sy < -2000.0f || v[i].sy > 2480.0f) {
             g_dbgBigQuads++;
-            {
+            if (s_desired.textureId != 15 && s_desired.textureId != 52) {
                 static int s_bigLog;
                 if (s_bigLog < 40) {
                     s_bigLog++;
                     fprintf(stderr, "bigquad tpage %d n=%d:", s_desired.textureId, count);
                     for (int k = 0; k < count && k < 4; k++)
-                        fprintf(stderr, " (%.0f,%.0f rhw=%g uv=%.2f,%.2f)", v[k].sx, v[k].sy, v[k].rhw, v[k].u, v[k].v);
+                        fprintf(stderr, " (%d,%d rhw*1e6=%d uv*100=%d,%d)", (int)v[k].sx, (int)v[k].sy,
+                                (int)(v[k].rhw * 1e6f), (int)(v[k].u * 100.0f), (int)(v[k].v * 100.0f));
                     fprintf(stderr, "\n");
                 }
             }
@@ -619,7 +648,7 @@ void R_DrawTriFan(const RenderVertex *v, int count)
                 break;
             }
         }
-        if (needClip && g_dbgMode == 4) {   /* A/B test: White+Back cycles to mode 4 */
+        if (needClip && g_dbgMode == 99) {   /* polygon clipping: disabled (made things worse) */
             int ok = 1;
             for (int i = 0; i < count; i++) if (!(v[i].rhw > 0.0f)) ok = 0;
             if (ok) {
