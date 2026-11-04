@@ -136,10 +136,11 @@ static void GL_ApplyTpageFilter(int tp)
 #ifdef SONICR_XBOX
     /* The retail PC version runs with bilinear filtering everywhere (Direct3D
      * on a 3D card); this decompilation point-samples. Default to bilinear on
-     * the Xbox (Back + R3 toggles it). */
+     * the Xbox for the 3D race scene (Back + R3 toggles it); 2D screens and
+     * the HUD stay point-sampled. */
     {
-        extern int g_xbBilinear;
-        if (g_xbBilinear) want = (unsigned char)(R_FILTER_LINEAR + 1);
+        extern int g_xbBilinear, g_xb3D;
+        if (g_xbBilinear && g_xb3D) want = (unsigned char)(R_FILTER_LINEAR + 1);
     }
 #endif
     if (s_glTextureFilter[tp] != want) {
@@ -488,6 +489,7 @@ void R_DebugGetState(int *depthTest, int *depthWrite, int *depthFunc,
 
 #ifdef SONICR_XBOX
 int g_xbBilinear = 1;
+int g_xb3D;        /* set by RenderHUD around the 3D scene */
 /* Forget which filter each texture object has, so the next bind re-applies. */
 void R_InvalidateTextureFilters(void)
 {

@@ -103,9 +103,10 @@ into the XBE after the build with `source/xbox/tools/set_titleid.py`).
   sun panorama rippled by multi-octave noise), as in the PC version. The
   desktop build defaults to a prototype that imitates the old software mode
   (`WATER_RIPPLE_SW` in `render_track_d3d.c`).
-- **Bilinear texture filtering** is on by default, like the retail PC version
-  running on a 3D card (this decompilation point-samples). Back + R3 (click the
-  right stick) toggles it. Colour-keyed texels are stored as transparent black
+- **Bilinear texture filtering** is on by default for the 3D race scene, like
+  the retail PC version running on a 3D card (this decompilation point-samples);
+  menus, logos and the HUD stay point-sampled so sprite edges stay clean.
+  Back + R3 (click the right stick) toggles it. Colour-keyed texels are stored as transparent black
   so filtering does not leave a green fringe.
 - **Character select:** locked slots (Eggman included) show the red X with the
   dark outline over the portrait, as the retail PC version does (the colour-keyed

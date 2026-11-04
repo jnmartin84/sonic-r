@@ -52,6 +52,14 @@ extern void DrawSnowParticlesGate(int vp);
 extern void RenderEnvMappedModel3D(int xOff, int yOff, int zBase,
     int rotA, int rotB, int rotC, int modelIdx, int zNearBias);
 extern void R_ClearDepth(void);
+#ifdef SONICR_XBOX
+/* Bilinear filtering applies to the 3D scene only (see GL_ApplyTpageFilter);
+ * menus, logos and HUD stay point-sampled so sprite edges stay clean. */
+extern int g_xb3D;
+#define XB3D(v) (g_xb3D = (v))
+#else
+#define XB3D(v) ((void)0)
+#endif
 extern void RenderHiddenSubEntry(int worldX, int worldZ, int worldY);
 extern void DrawMinimapWidget(char *vpPlayer);
 extern int QueryTerrainHeight(int worldX, int worldZ, int minY);
@@ -626,6 +634,7 @@ void RenderHUD(void)
         }
 #endif
 
+        XB3D(1);
         xbox_race_mark("HUD ComputeParallaxAndPlayfieldState");
         ComputeParallaxAndPlayfieldState(vp, g_currentRenderCam);
 
@@ -671,7 +680,9 @@ void RenderHUD(void)
         if (g_demoMode == DEMO_NONE) {
             int hudPlayerIdx = (g_isNetworkGame != 0) ? g_localPlayerIndex : (int)vp;
             xbox_race_mark("HUD DrawTimerAndStatus");
+            XB3D(0);
             DrawTimerAndStatus(hudPlayerIdx);
+            XB3D(1);
         }
 
         /* Track draws before characters — matches old batch flush order.
@@ -725,6 +736,7 @@ void RenderHUD(void)
 
         xbox_race_mark("HUD DrawOtherParticles");
         DrawOtherParticles();
+        XB3D(0);
 
         /* Demo/replay rotating "R" overlay — binary 0x4CD71B */
         if (g_skipThisFrame == 0 && g_demoMode != DEMO_NONE && vp == startViewport) {
