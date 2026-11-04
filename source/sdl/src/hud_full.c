@@ -643,7 +643,18 @@ void RenderHUD(void)
                 float *skyUpper = skyBase + 24;
                 int *vpCfg = (int *)((char *)g_viewportConfigArray + vp * 0xC8);
                 xbox_race_mark("HUD RenderPlayfieldGridD3D");
+#ifdef SONICR_XBOX
+                /* The grid is the ground layer under the track. On the Xbox its
+                 * tiles z-fight with the track surface at some spots (streaky
+                 * beige floor), so it must never write depth: the track drawn
+                 * right after then always wins where the two overlap. */
+                R_PushState();
+                R_SetDepthWrite(0);
                 RenderPlayfieldGridD3D(skyBase, skyUpper, vpCfg);
+                R_PopState();
+#else
+                RenderPlayfieldGridD3D(skyBase, skyUpper, vpCfg);
+#endif
             }
         }
 
