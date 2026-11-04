@@ -1072,13 +1072,13 @@ void platform_gl_swap(void)
                         s_cnt, span, s_cnt ? span / s_cnt : 0, s_cnt ? (span * 10 / s_cnt) % 10 : 0,
                         s_n50, s_n80, s_n120, s_max, s_cnt ? s_swapMs * 1000u / s_cnt : 0);
                 {
-                    extern int g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs, g_dbgBigQuads, g_dbgDraws[53];
+                    extern int g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs, g_dbgBigQuads, g_dbgClipped, g_dbgDraws[53];
                     unsigned nd = 0;
                     for (int t = 0; t < 53; t++) nd += (unsigned)g_dbgDraws[t];
-                    xb_logf("timing2: logic %u ms, render %u ms (race frames, sum); uploads %d (%d ms, max %d ms); draws/frame %u; big-quads %d\n",
+                    xb_logf("timing2: logic %u ms, render %u ms (race frames, sum); uploads %d (%d ms, max %d ms); draws/frame %u; big-quads %d; clipped %d\n",
                             g_dbgLogicMs, g_dbgRenderMs, g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs,
-                            nd / 600u, g_dbgBigQuads);
-                    g_dbgUploadCount = g_dbgUploadMs = g_dbgUploadMaxMs = g_dbgBigQuads = 0;
+                            nd / 600u, g_dbgBigQuads, g_dbgClipped);
+                    g_dbgUploadCount = g_dbgUploadMs = g_dbgUploadMaxMs = g_dbgBigQuads = g_dbgClipped = 0;
                     g_dbgLogicMs = g_dbgRenderMs = 0;
                     xb_logf("rain: active-slots/frame %d, drawn/frame %d, rejected/frame %d\n",
                             g_dbgRainActive / 600, g_dbgRainDrawn / 600, g_dbgRainRejected / 600);

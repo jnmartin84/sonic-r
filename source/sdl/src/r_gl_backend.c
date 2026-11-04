@@ -501,6 +501,80 @@ int   g_dbgDraws[53];
 int   g_dbgBigQuads;   /* draws with a vertex far outside the screen */
 float g_dbgVert[53][6];
 #endif
+
+#ifdef SONICR_XBOX
+/*
+ * Polygons that pass very close to the camera project to huge or wild screen
+ * coordinates (thousands of pixels outside the screen). The NV2A rasteriser
+ * does not cope with those: the textures smear into horizontal streaks or the
+ * floor vanishes. Such polygons are clipped here against a rectangle slightly
+ * larger than the screen (Sutherland-Hodgman, convex polygons). Depth and
+ * 1/w interpolate linearly in screen space, u/w and v/w too, so the result is
+ * exact for what is visible.
+ */
+int g_dbgClipped;
+typedef struct { float x, y, z, rhw, uw, vw, a, r, g, b; } XbClipV;
+
+static int xb_clip_edge(const XbClipV *in, int n, XbClipV *out, int axis, float lim, int keepGreater)
+{
+    int m = 0;
+    for (int i = 0; i < n; i++) {
+        const XbClipV *a = &in[i];
+        const XbClipV *b = &in[(i + 1) % n];
+        float av = axis ? a->y : a->x;
+        float bv = axis ? b->y : b->x;
+        int ain = keepGreater ? (av >= lim) : (av <= lim);
+        int bin = keepGreater ? (bv >= lim) : (bv <= lim);
+        if (ain) out[m++] = *a;
+        if (ain != bin) {
+            float t = (lim - av) / (bv - av);
+            XbClipV *o = &out[m++];
+            o->x = a->x + (b->x - a->x) * t;
+            o->y = a->y + (b->y - a->y) * t;
+            o->z = a->z + (b->z - a->z) * t;
+            o->rhw = a->rhw + (b->rhw - a->rhw) * t;
+            o->uw = a->uw + (b->uw - a->uw) * t;
+            o->vw = a->vw + (b->vw - a->vw) * t;
+            o->a = a->a + (b->a - a->a) * t;
+            o->r = a->r + (b->r - a->r) * t;
+            o->g = a->g + (b->g - a->g) * t;
+            o->b = a->b + (b->b - a->b) * t;
+        }
+    }
+    return m;
+}
+
+/* Returns the vertex count written to buf (10 floats per vertex, ready for
+ * xb_draw_fan), or 0 when the polygon is entirely outside the clip rectangle. */
+static int xb_clip_to_screen(const RenderVertex *v, int count, float *buf)
+{
+    XbClipV A[40], B[40];
+    const float k = 1.0f / 255.0f;
+    for (int i = 0; i < count; i++) {
+        uint32_t argb = v[i].color;
+        A[i].x = v[i].sx; A[i].y = v[i].sy; A[i].z = v[i].sz; A[i].rhw = v[i].rhw;
+        A[i].uw = v[i].u * v[i].rhw; A[i].vw = v[i].v * v[i].rhw;
+        A[i].a = (float)((argb >> 24) & 0xFF) * k;
+        A[i].r = (float)((argb >> 16) & 0xFF) * k;
+        A[i].g = (float)((argb >>  8) & 0xFF) * k;
+        A[i].b = (float)((argb      ) & 0xFF) * k;
+    }
+    int n = count;
+    n = xb_clip_edge(A, n, B, 0, -128.0f, 1);  if (n < 3) return 0;
+    n = xb_clip_edge(B, n, A, 0, 768.0f, 0);   if (n < 3) return 0;
+    n = xb_clip_edge(A, n, B, 1, -128.0f, 1);  if (n < 3) return 0;
+    n = xb_clip_edge(B, n, A, 1, 608.0f, 0);   if (n < 3) return 0;
+    for (int i = 0; i < n; i++) {
+        float rhw = A[i].rhw;
+        float w = (rhw > 0.0f) ? (1.0f / rhw) : 1.0f;
+        float *o = &buf[i * 10];
+        o[0] = A[i].x * w;  o[1] = A[i].y * w;  o[2] = A[i].z * w;  o[3] = w;
+        o[4] = A[i].r;  o[5] = A[i].g;  o[6] = A[i].b;  o[7] = A[i].a;
+        o[8] = A[i].uw * w;  o[9] = A[i].vw * w;
+    }
+    return n;
+}
+#endif
 void R_DrawTriFan(const RenderVertex *v, int count)
 {
     if (count < 3) {
@@ -526,6 +600,25 @@ void R_DrawTriFan(const RenderVertex *v, int count)
     }
     if (count <= 16) {
         float buf[16 * 10];
+        int needClip = 0;
+        for (int i = 0; i < count; i++) {
+            if (!(v[i].rhw > 0.0f) ||
+                v[i].sx < -256.0f || v[i].sx > 896.0f || v[i].sy < -256.0f || v[i].sy > 736.0f) {
+                needClip = 1;
+                break;
+            }
+        }
+        if (needClip) {
+            int ok = 1;
+            for (int i = 0; i < count; i++) if (!(v[i].rhw > 0.0f)) ok = 0;
+            if (ok) {
+                float cbuf[40 * 10];
+                int n = xb_clip_to_screen(v, count, cbuf);
+                g_dbgClipped++;
+                if (n >= 3) xb_draw_fan(cbuf, n);
+                return;
+            }
+        }
         for (int i = 0; i < count; i++) {
             uint32_t argb = v[i].color;
             float w = (v[i].rhw > 0.0f) ? (1.0f / v[i].rhw) : 1.0f;
