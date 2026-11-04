@@ -974,6 +974,7 @@ static void xb_logf(const char *fmt, ...)
 }
 
 static unsigned s_dhist[64];
+int g_xbWaterMode;   /* see FUN_0045ca28 (water reflection V mapping test) */
 /* Early lost-flip repair (see platform_gl_swap). After each swap we expect the
  * frame just finished to reach the screen within two VBlanks. Checked while the
  * next frame is being drawn (xb_draw_fan calls this every 128 fans): if the
@@ -1097,6 +1098,19 @@ void platform_gl_swap(void)
                 xb_logf("FILTER -> %s (frame %d)\n", g_xbBilinear ? "bilinear" : "nearest", s_frames);
             }
             s_bfPrev = bf;
+        }
+        {
+            /* L3 (left stick click) + Back: cycle the water reflection test modes. */
+            extern int g_xbWaterMode;
+            static int s_wmPrev;
+            int wm = (s_pads[0].ctrl &&
+                      SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_BACK) &&
+                      SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_LEFTSTICK)) ? 1 : 0;
+            if (wm && !s_wmPrev) {
+                g_xbWaterMode = (g_xbWaterMode + 1) % 3;
+                xb_logf("WATER MODE -> %d (frame %d)\n", g_xbWaterMode, s_frames);
+            }
+            s_wmPrev = wm;
         }
         {
             /* Y + Back: mark "I just saw a flash" in the log (frame + time). */
