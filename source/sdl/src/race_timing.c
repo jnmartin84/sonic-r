@@ -399,6 +399,12 @@ static int g_camInterpTgtZ;        /* 0x0094BD20 */
  * ===================================================================== */
 void LightningStrike(void)
 {
+#ifdef SONICR_XBOX
+    {
+        extern void xb_note(const char *what);
+        xb_note("lightning");
+    }
+#endif
     /* Play thunder SFX for the lightning strobe */
     PlaySoundEffect(0x2D, 0, 0);                                   /* EAX=0x2D, ECX=0, EBX=0, EDX=0 */
 

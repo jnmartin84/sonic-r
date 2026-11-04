@@ -972,6 +972,19 @@ static void xb_logf(const char *fmt, ...)
     if (s_xbLogLen > (int)sizeof(s_xbLog) - 1) s_xbLogLen = (int)sizeof(s_xbLog) - 1;
 }
 
+#ifdef SONICR_XBOX
+/* Timestamped event note for the log (first 80), used to line events up with
+ * what is seen on screen. */
+void xb_note(const char *what)
+{
+    static int s_n;
+    if (s_n < 80) {
+        s_n++;
+        xb_logf("event %s at frame %d, %u ms\n", what, g_xbFrames, (unsigned)SDL_GetTicks());
+    }
+}
+#endif
+
 void platform_gl_swap(void)
 {
 #ifdef SONICR_XBOX
@@ -1048,6 +1061,23 @@ void platform_gl_swap(void)
             if (s_hTick && nowH - s_hTick > 400) xb_log_flush();
             s_hUp = g_dbgUploadCount;
             s_hTick = nowH;
+        }
+        {
+            /* A frame with far fewer draws than usual is a likely "black flash". */
+            extern int g_dbgDraws[53];
+            static unsigned s_prevSum, s_avg, s_lastLow;
+            unsigned sum = 0;
+            for (int t = 0; t < 53; t++) sum += (unsigned)g_dbgDraws[t];
+            if (s_frames % 600 != 1 && sum >= s_prevSum) {
+                unsigned d = sum - s_prevSum;
+                if (s_frames > 200 && s_avg > 300 && d * 3 < s_avg) {
+                    xb_logf("LOWDRAW frame %d: %u draws (avg %u), %u ms since last, mark %s\n", s_frames, d, s_avg,
+                            (unsigned)SDL_GetTicks() - s_lastLow, (const char *)g_lastMark);
+                    s_lastLow = (unsigned)SDL_GetTicks();
+                }
+                s_avg = s_avg ? (s_avg * 15 + d) / 16 : d;
+            }
+            s_prevSum = sum;
         }
         if (s_frames <= 3 || s_frames % 600 == 0)
             xb_logf("frame %d\n", s_frames);
