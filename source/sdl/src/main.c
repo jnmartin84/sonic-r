@@ -1311,6 +1311,9 @@ race_start:
     g_raceStateCounter1 = 0;
     DebugLog("MAIN GAME LOOP\n");
 #ifdef SONICR_XBOX
+    { extern void xbox_log_mem(const char *where); xbox_log_mem("race start"); }
+#endif
+#ifdef SONICR_XBOX
     { extern void GL_PreuploadAll(void); GL_PreuploadAll(); }
 #endif
     g_splashCountdown = 2;
