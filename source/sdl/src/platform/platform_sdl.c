@@ -972,7 +972,30 @@ static void xb_logf(const char *fmt, ...)
     if (s_xbLogLen > (int)sizeof(s_xbLog) - 1) s_xbLogLen = (int)sizeof(s_xbLog) - 1;
 }
 
-static unsigned s_dhist[64];   /* draws per frame, indexed by frame & 63 */
+static unsigned s_dhist[64];
+int s_xbStatePrev[20], s_xbStatePrevOk;
+static void xb_capture_state(int *v)
+{
+    extern int g_processedObjectCount, g_totalObjects, g_farClipDepth;
+    extern int g_camIntX, g_camIntY, g_camIntZ, g_viewMtx[16];
+    extern int g_clipLeft, g_clipRight, g_clipTop, g_clipBottom;
+    extern int g_projScaleXCurrent, g_projScaleY, g_screenCenterX, g_screenCenterY;
+    int k = 0;
+    v[k++] = g_processedObjectCount; v[k++] = g_totalObjects; v[k++] = g_farClipDepth;
+    v[k++] = g_camIntX; v[k++] = g_camIntY; v[k++] = g_camIntZ;
+    v[k++] = g_viewMtx[2]; v[k++] = g_viewMtx[6]; v[k++] = g_viewMtx[10];
+    v[k++] = g_viewMtx[0]; v[k++] = g_viewMtx[4]; v[k++] = g_viewMtx[8];
+    v[k++] = g_clipLeft; v[k++] = g_clipRight; v[k++] = g_clipTop; v[k++] = g_clipBottom;
+    v[k++] = g_projScaleXCurrent; v[k++] = g_projScaleY; v[k++] = g_screenCenterX; v[k++] = g_screenCenterY;
+}
+static void xb_logf(const char *fmt, ...);
+static void xb_log_state(const char *tag, const int *v)
+{
+    xb_logf("%sobjs %d/%d far %d cam %d,%d,%d fwd %d,%d,%d right %d,%d,%d clip %d,%d,%d,%d proj %d,%d ctr %d,%d\n",
+            tag, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14],
+            v[15], v[16], v[17], v[18], v[19]);
+}
+   /* draws per frame, indexed by frame & 63 */
 #ifdef SONICR_XBOX
 /* Timestamped event note for the log (first 80), used to line events up with
  * what is seen on screen. */
@@ -1128,10 +1151,19 @@ void platform_gl_swap(void)
                         for (int t = 0; t < 53; t++)
                             if (s_goodT[t] > curT[t] + 20) xb_logf(" %d:%u->%u", t, s_goodT[t], curT[t]);
                         xb_logf("\n");
+                        {
+                            extern int s_xbStatePrev[20], s_xbStatePrevOk;
+                            int cur[20];
+                            xb_capture_state(cur);
+                            if (s_xbStatePrevOk) xb_log_state("  prev ", s_xbStatePrev);
+                            xb_log_state("  now  ", cur);
+                        }
                     }
                 }
                 else {
                     for (int t = 0; t < 53; t++) s_goodT[t] = curT[t];
+                    xb_capture_state(s_xbStatePrev);
+                    s_xbStatePrevOk = 1;
                 }
                 s_avg = s_avg ? (s_avg * 15 + d) / 16 : d;
             }
