@@ -303,6 +303,33 @@ void R_FlushState(void)
         s_current.alphaRef = s_desired.alphaRef;
     }
 
+#ifdef SONICR_XBOX
+    /* pbgl only writes the GPU window clip while GL_SCISSOR_TEST is on and
+     * never resets it when the test is turned off, so after a split-screen
+     * viewport the clip stayed on the right half for everything (menus, logos,
+     * 1-player races). Keep the test permanently on; "scissor disabled" is
+     * simply a full-screen rectangle. s_current holds the effective values. */
+    {
+        int ex = 0, ey = 0, ew = 640, eh = 480;
+        if (s_desired.scissorEnabled) {
+            ex = s_desired.scissorX;
+            ey = s_desired.scissorY;
+            ew = s_desired.scissorW;
+            eh = s_desired.scissorH;
+        }
+        if (s_current.scissorEnabled != 1 || ex != s_current.scissorX || ey != s_current.scissorY ||
+            ew != s_current.scissorW || eh != s_current.scissorH) {
+            XB_BEND();
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(ex, ey, ew, eh);
+            s_current.scissorEnabled = 1;
+            s_current.scissorX = ex;
+            s_current.scissorY = ey;
+            s_current.scissorW = ew;
+            s_current.scissorH = eh;
+        }
+    }
+#else
     /* Scissor enable/disable */
     if (s_desired.scissorEnabled != s_current.scissorEnabled) {
         XB_BEND();
@@ -330,6 +357,7 @@ void R_FlushState(void)
         s_current.scissorW = s_desired.scissorW;
         s_current.scissorH = s_desired.scissorH;
     }
+#endif
 }
 
 /* =====================================================================

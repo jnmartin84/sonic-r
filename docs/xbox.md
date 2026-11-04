@@ -122,6 +122,11 @@ image pillarboxed in the middle; otherwise it falls back to 640x480.
   that sometimes disappears. Under investigation. The streaky, stretched floor
   seen on Factory is fixed: the playfield grid (and water reflection) no longer
   write depth, so they cannot z-fight with the track surface.
+- Fixed: after a 2-player (split-screen) race the whole screen stayed cropped to
+  the right half, even in menus. pbgl only writes the GPU window clip while the
+  scissor test is on and never resets it when it is turned off, so the Xbox
+  backend now keeps the scissor test always on and treats "disabled" as a
+  full-screen rectangle.
 
 ## Credits
 
