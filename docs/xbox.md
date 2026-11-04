@@ -118,10 +118,20 @@ image pillarboxed in the middle; otherwise it falls back to 640x480.
   `SONICR.LOG` shows the free memory at several points.
 - Rendering relies on pbgl's fixed-function path; any texture or blend mode it
   does not implement will look wrong rather than crash.
-- Known visual bugs: rare brief black/blue flashes, and a texture (the "dog")
-  that sometimes disappears. Under investigation. The streaky, stretched floor
-  seen on Factory is fixed: the playfield grid (and water reflection) no longer
-  write depth, so they cannot z-fight with the track surface.
+- Known visual bug: a texture (the "dog") that sometimes disappears. Under
+  investigation.
+- Fixed: the black/blue flashes (a dark rectangle, mostly over the lower half of
+  the picture, every few seconds, even while paused). pbkit's triple buffering
+  can lose a flip when the frame-ready interrupt and a VBlank are serviced in
+  the same DPC pass: the VBlank handler marks the buffer as shown although the
+  display was never pointed at it, and the next frame then clears the buffer
+  that is still on screen. The port now checks the display address while the
+  next frame is drawn and repairs a lost flip right away; as a fallback, before
+  drawing into a back buffer it waits for (or forces) the pending flip if that
+  buffer is still on screen. The log counts the repairs ("lost flips fixed").
+- Fixed: the streaky, stretched floor seen on Factory. The playfield grid (and
+  water reflection) no longer write depth, so they cannot z-fight with the
+  track surface.
 - Fixed: after a 2-player (split-screen) race the whole screen stayed cropped to
   the right half, even in menus. pbgl only writes the GPU window clip while the
   scissor test is on and never resets it when it is turned off, so the Xbox

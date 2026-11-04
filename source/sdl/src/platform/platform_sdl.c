@@ -974,6 +974,26 @@ static void xb_logf(const char *fmt, ...)
 }
 
 static unsigned s_dhist[64];
+/* Early lost-flip repair (see platform_gl_swap). After each swap we expect the
+ * frame just finished to reach the screen within two VBlanks. Checked while the
+ * next frame is being drawn (xb_draw_fan calls this every 128 fans): if the
+ * display is still on the older buffer, point it at the finished frame now, so
+ * that by the next swap no wait is needed. */
+#define XB_PCRTC_START (*(volatile unsigned *)0xFD600800u)
+static volatile int s_fwArmed;
+static unsigned s_fwExpect, s_fwVbl;
+int g_flipEarly, g_flipLate;
+void xb_flip_watch(void)
+{
+    if (!s_fwArmed) return;
+    if ((unsigned)pb_get_vbl_counter() - s_fwVbl < 2u) return;
+    s_fwArmed = 0;
+    if ((XB_PCRTC_START & 0x03FFFFFFu) != s_fwExpect) {
+        XB_PCRTC_START = s_fwExpect;
+        g_flipEarly++;
+    }
+}
+
 int s_xbStatePrev[20], s_xbStatePrevOk;
 static void xb_capture_state(int *v)
 {
@@ -1172,24 +1192,6 @@ void platform_gl_swap(void)
             s_prevSum = sum;
             (void)s_lastLow;
         }
-        {
-            /* Static-scene check: once the per-tpage vertex hashes have been
-             * identical for 30 frames (pause / standing still), log any frame
-             * where some of them change, and which tpages. */
-            extern unsigned g_dbgVtxHash[54];
-            static unsigned s_prevH[54];
-            static int s_still, s_vcLog;
-            int nch = 0;
-            for (int t = 0; t < 54; t++) if (g_dbgVtxHash[t] != s_prevH[t]) nch++;
-            if (nch && s_still >= 30 && s_vcLog < 80) {
-                s_vcLog++;
-                xb_logf("VTXCHANGE frame %d (still for %d frames), tpages:", s_frames, s_still);
-                for (int t = 0; t < 54; t++) if (g_dbgVtxHash[t] != s_prevH[t]) xb_logf(" %d", t - 1);
-                xb_logf("\n");
-            }
-            s_still = nch ? 0 : s_still + 1;
-            for (int t = 0; t < 54; t++) { s_prevH[t] = g_dbgVtxHash[t]; g_dbgVtxHash[t] = 0; }
-        }
         if (s_frames <= 3 || s_frames % 600 == 0)
             xb_logf("frame %d\n", s_frames);
         {
@@ -1216,9 +1218,10 @@ void platform_gl_swap(void)
                     extern int g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs, g_dbgBigQuads, g_dbgClipped, g_dbgWideW, g_dbgDraws[53];
                     unsigned nd = 0;
                     for (int t = 0; t < 53; t++) nd += (unsigned)g_dbgDraws[t];
-                    xb_logf("timing2: logic %u ms, render %u ms (race frames, sum); uploads %d (%d ms, max %d ms); draws/frame %u; big-quads %d; wide-w %d\n",
+                    xb_logf("timing2: logic %u ms, render %u ms (race frames, sum); uploads %d (%d ms, max %d ms); draws/frame %u; big-quads %d; wide-w %d; lost flips fixed early %d, late %d\n",
                             g_dbgLogicMs, g_dbgRenderMs, g_dbgUploadCount, g_dbgUploadMs, g_dbgUploadMaxMs,
-                            nd / 600u, g_dbgBigQuads, g_dbgWideW);
+                            nd / 600u, g_dbgBigQuads, g_dbgWideW, g_flipEarly, g_flipLate);
+                    g_flipEarly = g_flipLate = 0;
                     g_dbgUploadCount = g_dbgUploadMs = g_dbgUploadMaxMs = g_dbgBigQuads = g_dbgClipped = g_dbgWideW = 0;
                     g_dbgLogicMs = g_dbgRenderMs = 0;
                     xb_logf("rain: active-slots/frame %d, drawn/frame %d, rejected/frame %d\n",
@@ -1278,13 +1281,14 @@ void platform_gl_swap(void)
              * buffer that is still on screen -> a black/blue area below the
              * beam for one refresh (the "black flashes"). Before drawing into
              * the new back buffer, make sure it is not the one being shown. */
-            #define XB_PCRTC_START (*(volatile unsigned *)0xFD600800u)
             unsigned prevBack = (unsigned)(uintptr_t)pb_back_buffer() & 0x03FFFFFFu;
+            s_fwArmed = 0;
             pbgl_swap_buffers();
             {
                 static int s_fixLog;
                 unsigned back = (unsigned)(uintptr_t)pb_back_buffer() & 0x03FFFFFFu;
                 if ((XB_PCRTC_START & 0x03FFFFFFu) == back) {
+                    /* Not caught early (short frame): wait for the pending flip. */
                     int n = 0, forced = 0;
                     while ((XB_PCRTC_START & 0x03FFFFFFu) == back && n < 3) {
                         pb_wait_for_vbl();
@@ -1294,12 +1298,16 @@ void platform_gl_swap(void)
                         XB_PCRTC_START = prevBack;   /* show the frame we just finished */
                         forced = 1;
                     }
-                    if (s_fixLog < 60) {
+                    g_flipLate++;
+                    if (s_fixLog < 10) {
                         s_fixLog++;
                         xb_logf("FLIPFIX frame %d: back buffer was on screen (waited %d vbl%s)\n", (int)g_xbFrames, n,
                                 forced ? ", forced flip" : "");
                     }
                 }
+                s_fwExpect = prevBack;
+                s_fwVbl = (unsigned)pb_get_vbl_counter();
+                s_fwArmed = 1;
             }
             if (g_dbgSwapAcc) *g_dbgSwapAcc += (unsigned)SDL_GetTicks() - ts;
         }

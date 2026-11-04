@@ -43,60 +43,6 @@ static void xb_pb_note(void)
  * randomly vanishing).
  *   0 = pbgl defaults, 1 = Z compression off, 2 = near/far clamp instead of cull,
  *   3 = both. */
-/* Flash hunt: check once per frame, per texture, that the texture object and
- * its pixel memory are still what they were after the last upload. A flash
- * with no draw-count change points to a texture going bad. */
-extern volatile int g_xbFrames;
-extern int g_dbgUploadCount;
-typedef struct { texture_t *p; GLubyte *data; GLuint w, h; unsigned hash; int frame, upl; } XbAudit;
-static XbAudit s_au[64];
-static int s_auN, s_auLog;
-static unsigned xb_au_hash(const texture_t *t)
-{
-    const unsigned *d = (const unsigned *)t->data;
-    unsigned n = t->size / 4u, h = 2166136261u;
-    for (unsigned i = 0; i < 64; i++) h = (h ^ d[(n / 64u) * i]) * 16777619u;
-    return h;
-}
-void xb_tex_audit(int tpage)
-{
-    texture_t *t = pbgl.tex[0].tex;
-    int i;
-    if (tpage < 0 || s_auLog >= 60) return;
-    if (!pbgl.tex[0].enabled) {
-        s_auLog++;
-        fprintf(stderr, "TEXOFF tpage %d drawn with texturing disabled (frame %d)\n", tpage, (int)g_xbFrames);
-        return;
-    }
-    if (!t) return;
-    for (i = 0; i < s_auN; i++) if (s_au[i].p == t) break;
-    if (i == s_auN) {
-        if (s_auN >= 64) return;
-        s_au[s_auN].p = t; s_au[s_auN].frame = -1; s_au[s_auN].data = NULL;
-        s_auN++;
-    }
-    XbAudit *e = &s_au[i];
-    if (e->frame == (int)g_xbFrames) return;
-    e->frame = (int)g_xbFrames;
-    if (!t->allocated || !t->data || t->size < 256u) {
-        s_auLog++;
-        fprintf(stderr, "TEXBAD tpage %d alloc=%d data=%p size=%u (frame %d)\n", tpage, (int)t->allocated,
-                (void *)t->data, (unsigned)t->size, (int)g_xbFrames);
-        return;
-    }
-    unsigned h = xb_au_hash(t);
-    if (e->data != t->data || e->w != t->width || e->h != t->height || e->upl != g_dbgUploadCount) {
-        e->data = t->data; e->w = t->width; e->h = t->height; e->upl = g_dbgUploadCount; e->hash = h;
-        return;
-    }
-    if (h != e->hash) {
-        s_auLog++;
-        fprintf(stderr, "TEXHASH tpage %d (%ux%u) pixel memory changed without an upload (frame %d)\n", tpage,
-                (unsigned)t->width, (unsigned)t->height, (int)g_xbFrames);
-        e->hash = h;
-    }
-}
-
 void xb_batch_end(void);
 int xb_gpu_exp;
 void xb_gpu_experiment(int e)
@@ -118,8 +64,13 @@ void xb_batch_end(void)
 }
 
 /* verts: n entries of {x, y, z, w, r, g, b, a, u, v} (x,y,z already multiplied by w) */
+void xb_flip_watch(void);
 void xb_draw_fan(const float *verts, int n)
 {
+    {
+        static unsigned s_fwN;
+        if ((++s_fwN & 127u) == 0) xb_flip_watch();
+    }
     if (s_open && xb_pb_head && (s_p - xb_pb_head) > XB_PB_LIMIT_DWORDS) {
         pb_end(s_p);
         s_open = 0;

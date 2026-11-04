@@ -103,7 +103,6 @@ extern GLuint s_glTextures[];       /* render_gl.c */
 #ifdef SONICR_XBOX
 extern void xb_batch_end(void);
 extern void xb_draw_fan(const float *verts, int n);
-extern void xb_tex_audit(int tpage);
 #define XB_BEND() xb_batch_end()
 #else
 #define XB_BEND() ((void)0)
@@ -528,7 +527,6 @@ static inline void R_EmitVertex(const RenderVertex *v)
 /* Per-tpage draw statistics for on-hardware debugging (see platform_gl_swap). */
 int   g_dbgMode;     /* Back button cycles 0..4 for on-hardware experiments */
 int   g_dbgDraws[53];
-unsigned g_dbgVtxHash[54];   /* [tpage + 1], reset every frame */
 int   g_dbgBigQuads;   /* draws with a vertex far outside the screen */
 float g_dbgVert[53][6];
 #endif
@@ -624,35 +622,6 @@ void R_DrawTriFan(const RenderVertex *v, int count)
 
     R_FlushState();
 #ifdef SONICR_XBOX
-    {
-        /* Black-flash hunt: bad coordinates, or a big dark polygon. */
-        static int s_flashLog;
-        float x0 = 1e30f, x1 = -1e30f, y0 = 1e30f, y1 = -1e30f;
-        int bad = 0, dark = 1;
-        for (int i = 0; i < count; i++) {
-            float x = v[i].sx, y = v[i].sy;
-            if (!(x > -1e7f && x < 1e7f && y > -1e7f && y < 1e7f)) bad = 1;
-            if (x < x0) x0 = x;
-            if (x > x1) x1 = x;
-            if (y < y0) y0 = y;
-            if (y > y1) y1 = y;
-            if ((((v[i].color >> 16) & 0xFF) > 0x30) || (((v[i].color >> 8) & 0xFF) > 0x30) ||
-                ((v[i].color & 0xFF) > 0x30) || ((v[i].color >> 24) < 0x80))
-                dark = 0;
-        }
-        if (!bad) {
-            float cx0 = x0 < 0 ? 0 : x0, cx1 = x1 > 640 ? 640 : x1;
-            float cy0 = y0 < 0 ? 0 : y0, cy1 = y1 > 480 ? 480 : y1;
-            float area = (cx1 > cx0 && cy1 > cy0) ? (cx1 - cx0) * (cy1 - cy0) : 0.0f;
-            if (dark && area > 0.25f * 640.0f * 480.0f) bad = 2;
-        }
-        if (bad && s_flashLog < 40) {
-            s_flashLog++;
-            fprintf(stderr, "FLASHPOLY(%d) tpage %d n=%d frame-mark box=(%d,%d)-(%d,%d) color=%08x blend=%d depth=%d\n", bad,
-                    s_desired.textureId, count, (int)x0, (int)y0, (int)x1, (int)y1, (unsigned)v[0].color,
-                    s_desired.blendMode, s_desired.depthTest);
-        }
-    }
     if (g_dbgMode == 4 && (s_desired.textureId == 16 || s_desired.textureId == 17)) {
         return;   /* debug mode 4: hide the playfield grid tiles (tpages 16/17) */
     }
@@ -730,19 +699,6 @@ void R_DrawTriFan(const RenderVertex *v, int count)
             o[6] = (float)((argb      ) & 0xFF) * k;
             o[7] = (float)((argb >> 24) & 0xFF) * k;
             o[8] = v[i].u;  o[9] = v[i].v;
-        }
-        xb_tex_audit(s_desired.textureId);
-        {
-            /* Flash hunt: hash of everything sent to the GPU, per tpage. In a
-             * paused (static) scene it must not change from frame to frame. */
-            extern unsigned g_dbgVtxHash[54];
-            const unsigned *w = (const unsigned *)buf;
-            int hi = (s_desired.textureId >= -1 && s_desired.textureId <= 52) ? s_desired.textureId + 1 : 0;
-            unsigned h = g_dbgVtxHash[hi];
-            for (int k = 0; k < count * 10; k++) h = ((h << 5) | (h >> 27)) ^ w[k];
-            h = ((h << 5) | (h >> 27)) ^ ((unsigned)s_desired.blendMode << 8 | (unsigned)s_desired.depthTest << 4 |
-                                         (unsigned)s_desired.depthWrite);
-            g_dbgVtxHash[hi] = h;
         }
         xb_draw_fan(buf, count);
         return;
