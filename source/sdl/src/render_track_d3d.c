@@ -69,7 +69,13 @@ extern void RenderHiddenSubEntry(int worldX, int worldZ, int worldY);
  *       band/strip/substrip walk and UV layout but replaces the animation
  *       with the software renderer's ripple (0x4A84C8) — the look of the
  *       retail software mode. See DESIGN_water_ripple.md. */
+#ifdef SONICR_XBOX
+/* Xbox: use the faithful retail D3D water (what the PC version shows: the
+ * mirrored sky/sun panorama rippled by the multi-octave noise). */
+#define WATER_RIPPLE_SW 0
+#else
 #define WATER_RIPPLE_SW 1
+#endif
 
 #define recip256 0.00390625f
 #define recip256_over_2 0.00195312f

@@ -98,6 +98,10 @@ into the XBE after the build with `source/xbox/tools/set_titleid.py`).
   fast `memcpy`/`memset` and a faster texture upload.
 - `SONICR.LOG` starts with the build time of the XBE, so you can tell which
   build produced it.
+- **Water** uses the faithful retail Direct3D renderer (the mirrored sky and
+  sun panorama rippled by multi-octave noise), as in the PC version. The
+  desktop build defaults to a prototype that imitates the old software mode
+  (`WATER_RIPPLE_SW` in `render_track_d3d.c`).
 
 ## Video mode
 
