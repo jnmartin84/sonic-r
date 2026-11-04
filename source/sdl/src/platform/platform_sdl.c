@@ -1343,6 +1343,32 @@ void platform_get_drawable_size(int *w, int *h)
  * Networking - no-ops on SDL (OS stack is always available)
  * ===================================================================== */
 
+#ifdef SONICR_XBOX
+/* Raw controller buttons for the network lobby, OR'd across all pads (the
+ * lobby's actions are keyboard F-keys on PC; see NetSynthPadKeys). */
+unsigned int platform_menu_buttons(void)
+{
+    unsigned int m = 0;
+    SDL_GameControllerUpdate();
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        SDL_GameController *c = s_pads[i].ctrl;
+        if (!c) continue;
+        if (SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_A))          m |= MENUBTN_A;
+        if (SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_B))          m |= MENUBTN_B;
+        if (SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_X))          m |= MENUBTN_X;
+        if (SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_Y))          m |= MENUBTN_Y;
+        if (SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_START))      m |= MENUBTN_START;
+        if (SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_TRIGGERLEFT)  > 16000) m |= MENUBTN_L;
+        if (SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 16000) m |= MENUBTN_R;
+        if (SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_UP))    m |= MENUBTN_UP;
+        if (SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_DOWN))  m |= MENUBTN_DOWN;
+        if (SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_LEFT))  m |= MENUBTN_LEFT;
+        if (SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) m |= MENUBTN_RIGHT;
+    }
+    return m;
+}
+#endif
+
 int platform_net_init(void)
 {
     return 0;

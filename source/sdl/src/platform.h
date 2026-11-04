@@ -137,7 +137,7 @@ int platform_net_is_modem(void);
 /* Returns the console region (DC: 1=JP, 2=US, 3=EU from flashrom; other: 0). */
 int platform_get_region(void);
 
-#ifdef SONICR_DC
+#if defined(SONICR_DC) || defined(SONICR_XBOX)
 /* Raw controller buttons for the DC menu screens the keyboard-era UI never
  * mapped to a pad (the network lobby: F1/F2/F3/F6/F7/F8). Physical buttons,
  * bypassing the gameplay remap, OR'd across all ports. Bit set = held. */

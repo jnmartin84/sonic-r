@@ -19,6 +19,8 @@
 /* Platform / connection strings for session registration */
 #ifdef SONICR_DC
 #define MM_PLATFORM     "dreamcast"
+#elif defined(SONICR_XBOX)
+#define MM_PLATFORM     "xbox"
 #elif defined(_WIN32)
 #define MM_PLATFORM     "windows"
 #elif defined(__linux__)

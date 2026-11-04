@@ -444,6 +444,14 @@ void MatchmakerClearSession(void)
 int  UpnpOpenPort(int port)  { (void)port; return 0; }
 void UpnpClosePort(int port) { (void)port; }
 
+#elif defined(SONICR_XBOX)
+
+/* Xbox: no miniupnpc; use the self-contained SSDP/SOAP client in net_upnp.c. */
+#include "net_upnp.h"
+
+int  UpnpOpenPort(int port)  { return net_upnp_open_port(port); }
+void UpnpClosePort(int port) { net_upnp_close_port(port); }
+
 #else /* desktop: miniupnpc */
 
 #include <miniupnpc/miniupnpc.h>

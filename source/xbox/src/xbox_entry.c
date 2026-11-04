@@ -214,7 +214,8 @@ static void xb_udata_init(void)
 
 /* fopen wrapper: relative paths ("BIN/OPTION/X.RAW") are taken as relative to
  * D:\, '/' becomes '\'. Save data (SAVE\, SONICR.INF, JOYSTICK.INF, GHOST\)
- * goes to E:\UDATA\<TitleID>\<folder>\ so the dashboard lists and manages it. */
+ * goes to E:\UDATA\<TitleID>\<folder>\ so the dashboard lists and manages it.
+ * ONLINE.DAT (the online sign-in token) is kept with the settings. */
 FILE *xb_fopen(const char *path, const char *mode)
 {
     char rel[400], buf[560];
@@ -234,7 +235,8 @@ FILE *xb_fopen(const char *path, const char *mode)
         if (s_ud[0]) {
             if (!_strnicmp(rel, "SAVE\\", 5))          folder = UD_SAVES;
             else if (!_strnicmp(rel, "GHOST\\", 6))    folder = UD_GHOSTS;
-            else if (!_stricmp(rel, "SONICR.INF") || !_stricmp(rel, "JOYSTICK.INF"))
+            else if (!_stricmp(rel, "SONICR.INF") || !_stricmp(rel, "JOYSTICK.INF") ||
+                     !_stricmp(rel, "ONLINE.DAT"))   /* online sign-in token */
                                                        folder = UD_SETTINGS;
         }
         if (folder) snprintf(buf, sizeof(buf), "%s\\%s\\%s", s_ud, folder, rel);

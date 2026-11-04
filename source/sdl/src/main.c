@@ -722,6 +722,9 @@ def SONICR_DC /* DC splash screen */
     }
 #endif /* DC splash screen */
 
+#ifdef SONICR_XBOX
+    { extern void xbox_net_start(void); xbox_net_start(); }   /* DHCP in the background */
+#endif
     if (net_transport_init() != 0) {
         fprintf(stderr, "net_transport_init failed\n");
 #ifndef __EMSCRIPTEN__

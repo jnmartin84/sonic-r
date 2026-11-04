@@ -479,7 +479,9 @@ int net_slot_is_connected(int slot)
     return s_playerValid[slot] ? 1 : 0;
 }
 
-#ifdef SONICR_DC
+#if defined(SONICR_DC) || defined(SONICR_XBOX)
+/* Xbox: nxdk's lwIP has no ICMP datagram sockets (the POSIX probe would
+ * open a plain UDP socket and wait forever). */
 
 int net_probe_ping(const char *ip, int port, int timeout_ms)
 {

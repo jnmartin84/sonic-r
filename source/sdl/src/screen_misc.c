@@ -4921,7 +4921,7 @@ static void RenderSignInScreen(const uint8_t *qrBuf, int qrSize,
  * Adapted from binary with DirectPlay calls replaced by cross-platform
  * stubs. Modem states (0xA–0xC) stripped — not relevant for LAN/UDP.
  */
-#ifdef SONICR_DC
+#if defined(SONICR_DC) || defined(SONICR_XBOX)
 /* The network lobby was keyboard-only — F1 Host/Start, F2 Join, F3 LAN-only,
  * F6 character, F8 track, F7 mode. A stock DC has no keyboard, so map raw
  * controller buttons onto those F-key slots each frame, right after ReadInput

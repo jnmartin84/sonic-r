@@ -417,6 +417,18 @@ static long do_request(const char *method, const char *url,
 
         br_ssl_client_init_full(&sc, &xc, TAs, TAs_NUM);
         br_ssl_engine_set_buffer(&sc.eng, iobuf, sizeof(iobuf), 1);
+#ifdef SONICR_XBOX
+        {
+            /* No OS random source on the Xbox (no /dev/urandom, no RDRAND on
+             * the Pentium III), so BearSSL has nothing to seed its PRNG with
+             * and the handshake would fail. Feed it timing jitter: the CPU
+             * cycle counter sampled around short sleeps, plus the clock. */
+            extern void xb_gather_entropy(unsigned char *out, int len);
+            unsigned char seed[64];
+            xb_gather_entropy(seed, (int)sizeof(seed));
+            br_ssl_engine_inject_entropy(&sc.eng, seed, sizeof(seed));
+        }
+#endif
 
         if (!br_ssl_client_reset(&sc, parts.host, 0)) {
             DebugLog("net_https: SSL reset failed, err=%d\n", sc.eng.err);

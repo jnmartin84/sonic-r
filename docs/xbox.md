@@ -112,6 +112,33 @@ into the XBE after the build with `source/xbox/tools/set_titleid.py`).
   dark outline over the portrait, as the retail PC version does (the colour-keyed
   X in `SCHAR00.RAW`), instead of the additive X variants.
 
+## Online and LAN play (experimental)
+
+The desktop port's network play is built in: sign-in and the session list go
+through the Reality Jump matchmaker over HTTPS (BearSSL), and races run over
+UDP directly between the consoles/PCs, with UPnP to open the host's port.
+
+- **Network:** plug in the Ethernet cable. The console uses the dashboard's
+  network settings (DHCP or a static address). The connection comes up in the
+  background at boot; `SONICR.LOG` shows `net: up, IP ...` or `net: no network`.
+- **Extra file:** copy `DATA/BIN/OPTION/NET01.RAW` from this repository into
+  the game's `BIN\OPTION\` folder (network-screen platform icons, not part of
+  the original PC data).
+- **Sign-in:** the first time, the network screen shows a code and a QR code;
+  open the address on a phone or PC and sign in. The token is saved in
+  `E:\UDATA\<TitleID>\` with the settings, so later launches skip this step.
+- **Lobby buttons:** A / Start host or start the race, right trigger join, Y
+  LAN-only, left trigger change mode, D-pad left/right character, D-pad up/down
+  track, B back.
+- The console registers as platform `xbox`.
+
+Under the hood: nxdk's lwIP provides the BSD socket API through small shim
+headers in `source/xbox/include/` (`sys/socket.h`, `netdb.h`, ...).
+`SO_RCVTIMEO`, which nxdk's lwIP leaves out, is emulated with `select()`.
+BearSSL is built without the SSE2/AES-NI/PCLMUL/RDRAND paths (the Pentium III
+has none of them) and is seeded from CPU-cycle-counter timing jitter, since the
+Xbox has no OS random source.
+
 ## Video mode
 
 The game renders at 640x480 (4:3). By default the Xbox build uses **640x480**:
@@ -124,7 +151,6 @@ image pillarboxed in the middle; otherwise it falls back to 640x480.
 
 ## Known limitations
 
-- No online play.
 - Memory is the main constraint (64 MB total). Sound effects are kept in their
   original mono 22.05 kHz format (about 8 MB) and resampled while mixing;
   converting them to 44.1 kHz stereo used 32 MB and left no room for textures.
