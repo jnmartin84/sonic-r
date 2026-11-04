@@ -1013,7 +1013,7 @@ void platform_gl_swap(void)
                         SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_BACK) &&
                         SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) ? 1 : 0;
             if (back && !s_backPrev) {
-                g_dbgMode = (g_dbgMode + 1) % 9;   /* 1=magenta blocks 2=full texture 3=no tests 5-8=viewer */
+                g_dbgMode = (g_dbgMode + 1) % 9;   /* 1=magenta blocks 2=full texture 3=no tests 4=clip big polygons 5-8=viewer */
                 {
                     extern int g_screenWidth, g_screenHeight, g_screenHeightFull, g_clipLeft, g_clipRight,
                                g_clipTop, g_clipBottom, g_projScaleXCurrent, g_projScaleY;

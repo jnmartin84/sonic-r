@@ -9,6 +9,7 @@
 #ifndef SONICR_SOFT_RENDER
 
 #ifdef __APPLE__
+#include <stdio.h>
 #include <OpenGL/gl.h>
 #elif defined(_WIN32)
 #include <GL/glew.h>
@@ -595,6 +596,16 @@ void R_DrawTriFan(const RenderVertex *v, int count)
     for (int i = 0; i < count; i++) {
         if (v[i].sx < -2000.0f || v[i].sx > 2640.0f || v[i].sy < -2000.0f || v[i].sy > 2480.0f) {
             g_dbgBigQuads++;
+            {
+                static int s_bigLog;
+                if (s_bigLog < 40) {
+                    s_bigLog++;
+                    fprintf(stderr, "bigquad tpage %d n=%d:", s_desired.textureId, count);
+                    for (int k = 0; k < count && k < 4; k++)
+                        fprintf(stderr, " (%.0f,%.0f rhw=%g uv=%.2f,%.2f)", v[k].sx, v[k].sy, v[k].rhw, v[k].u, v[k].v);
+                    fprintf(stderr, "\n");
+                }
+            }
             break;
         }
     }
@@ -608,7 +619,7 @@ void R_DrawTriFan(const RenderVertex *v, int count)
                 break;
             }
         }
-        if (needClip) {
+        if (needClip && g_dbgMode == 4) {   /* A/B test: White+Back cycles to mode 4 */
             int ok = 1;
             for (int i = 0; i < count; i++) if (!(v[i].rhw > 0.0f)) ok = 0;
             if (ok) {
