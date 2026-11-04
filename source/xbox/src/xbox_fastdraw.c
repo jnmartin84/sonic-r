@@ -25,9 +25,10 @@ static uint32_t *s_p;
 static int s_open;
 
 /* Start of the push buffer (set by the frame swap code after pb_reset).
- * pbkit has no wrap: a frame writing more than the 512 KB buffer runs past its
- * end and corrupts whatever memory follows (textures, geometry). Reset mid-frame
- * (GPU drains, then jumps back to head) when the buffer gets 3/4 full. */
+ * platform_init enlarges the push buffer to 4 MB (pb_size). pbkit has no wrap,
+ * so a frame writing more than that would run past the end. Safety net only:
+ * reset mid-frame (GPU drains, then jumps back to head) at 3 MB. Normal frames
+ * use well under 1.5 MB, so this should never fire (it is logged if it does). */
 uint32_t *xb_pb_head;
 int xb_pb_resets;
 static void xb_pb_note(void)
@@ -35,7 +36,7 @@ static void xb_pb_note(void)
     if (++xb_pb_resets <= 20)
         fprintf(stderr, "pushbuffer: mid-frame reset #%d\n", xb_pb_resets);
 }
-#define XB_PB_LIMIT_DWORDS (96 * 1024)
+#define XB_PB_LIMIT_DWORDS (768 * 1024)
 
 void xb_batch_end(void)
 {
