@@ -102,6 +102,9 @@ into the XBE after the build with `source/xbox/tools/set_titleid.py`).
   sun panorama rippled by multi-octave noise), as in the PC version. The
   desktop build defaults to a prototype that imitates the old software mode
   (`WATER_RIPPLE_SW` in `render_track_d3d.c`).
+- **Character select:** locked slots (Eggman included) show the red X with the
+  dark outline over the portrait, as the retail PC version does (the colour-keyed
+  X in `SCHAR00.RAW`), instead of the additive X variants.
 
 ## Video mode
 

@@ -788,6 +788,15 @@ int CharacterSelectScreen(void)
              * There is a third copy of the red X at (0xE4, 0xC8) on a green
              * colour-key background. Nothing in the binary reads it. */
             if (g_charUnlockTable[ci] != 2) {
+#ifdef SONICR_XBOX
+                /* Match the retail PC version as seen on real hardware: every
+                 * locked slot, Eggman included, gets the red X with the dark
+                 * outline, i.e. the copy at (0xE4, 0xC8) on the green
+                 * colour-key background, drawn with normal (colour-keyed)
+                 * blending over the portrait/silhouette. */
+                DrawTexturedQuad(charPos, 0x168, 0x433E0000, 0x38, 0x50,
+                                 g_uiTexPage + 1, 0xE4, 0xC8, 0x1C, 0x28, VERTEX_WHITE);
+#else
                 int xUvX = (ci == 4) ? 0xC8 : 0xE4;      /* 0x48d7e4 / 0x48d7f2 */
                 int xUvY = (ci == 4) ? 0xC8 : 0xA0;
                 R_PushState();
@@ -795,6 +804,7 @@ int CharacterSelectScreen(void)
                 DrawTexturedQuad(charPos, 0x168, 0x433E0000, 0x38, 0x50,
                                  g_uiTexPage + 1, xUvX, xUvY, 0x1C, 0x28, VERTEX_WHITE);
                 R_PopState();
+#endif
             }
         }
         
