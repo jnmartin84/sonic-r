@@ -598,23 +598,6 @@ static void FUN_0045ca28(int vpIdx)
             float uBase = uvU[bandIdx];
             float vRowTop = vBase[bandIdx] + vHalfHeight[8 - strip];
             float vRowBot = vBase[bandIdx] + vHalfHeight[8 - (strip + 1)];
-#ifdef SONICR_XBOX
-            {
-                /* Test modes (Back + L3 cycles) to match the PC look:
-                 *   0 = mirror of the whole panorama (hills right under the horizon)
-                 *   1 = mirror of the sky half only (rows 64..0)
-                 *   2 = not mirrored (top of the sky at the horizon)  */
-                extern int g_xbWaterMode;
-                if (g_xbWaterMode == 1) {
-                    vRowTop = vBase[bandIdx] + 0.5f * vHalfHeight[8 - strip];
-                    vRowBot = vBase[bandIdx] + 0.5f * vHalfHeight[8 - (strip + 1)];
-                }
-                else if (g_xbWaterMode == 2) {
-                    vRowTop = vBase[bandIdx] + vHalfHeight[strip];
-                    vRowBot = vBase[bandIdx] + vHalfHeight[strip + 1];
-                }
-            }
-#endif
 
             /* INNER SUBSTRIP LOOP — 8 horizontal substrips per strip,
              * indexed by `sub` 0..7. Each emits one quad. The half-band
