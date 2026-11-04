@@ -1038,6 +1038,19 @@ void platform_gl_swap(void)
             s_backPrev = back;
         }
         {
+            /* RB + Back: pause/resume the music (black-flash test: is it the audio?). */
+            static int s_muPrev, s_muOff;
+            int mu = (s_pads[0].ctrl &&
+                      SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_BACK) &&
+                      SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) ? 1 : 0;
+            if (mu && !s_muPrev) {
+                s_muOff = !s_muOff;
+                { extern int xb_musicPaused; xb_musicPaused = s_muOff; }
+                fprintf(stderr, "MUSIC %s (frame %d)\n", s_muOff ? "PAUSED" : "RESUMED", s_frames);
+            }
+            s_muPrev = mu;
+        }
+        {
             /* Log frames that took unusually long (stutter hunting). */
             static unsigned s_lastTick;
             unsigned now = (unsigned)SDL_GetTicks();

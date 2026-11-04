@@ -44,6 +44,7 @@ static Mix_Music *s_music;
 static int        s_musicPlaying;
 static int        s_musicLoops;
 static int        s_musicVolume = MIX_MAX_VOLUME;
+int               xb_musicPaused;   /* diagnostic: stops disk reads + mixing of the music */
 
 static char s_err[128] = "";
 
@@ -165,7 +166,7 @@ static int music_producer(void *arg)
     while (!s_musQuit) {
         int did = 0;
         SDL_LockMutex(s_musMutex);
-        if (s_musicPlaying && s_music && !s_rEof &&
+        if (s_musicPlaying && s_music && !s_rEof && !xb_musicPaused &&
             (MUS_RING - (s_rHead - s_rTail)) >= sizeof(tmp)) {
             size_t got = SDL_RWread(s_music->rw, tmp, 1, sizeof(tmp));
             if (got == 0) {
@@ -224,7 +225,7 @@ static void SDLCALL audio_cb(void *ud, Uint8 *stream, int len)
 {
     (void)ud;
     SDL_memset(stream, 0, (size_t)len);
-    if (s_musicPlaying && s_music) {
+    if (s_musicPlaying && s_music && !xb_musicPaused) {
         mix_music(stream, len);
     }
     for (int i = 0; i < s_numChan; i++) {
