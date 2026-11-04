@@ -113,6 +113,19 @@ void xb_draw_fan(const float *verts, int n)
 void xb_tex_image_rgba(int w, int h, const void *rgba)
 {
     xb_batch_end();
+    {
+        /* Re-uploading a texture the GPU may still be sampling from commands
+         * already queued this frame rewrites (or frees) its memory under the
+         * GPU: earlier draws then show the wrong texture. Drain the GPU first. */
+        texture_t *cur = pbgl.tex[pbgl.active_tex_sv].tex;
+        if (cur && cur->allocated) {
+            static int s_syncs;
+            while (pb_busy())
+                ;
+            if (++s_syncs <= 10)
+                fprintf(stderr, "texture re-upload: GPU drained (#%d)\n", s_syncs);
+        }
+    }
     if (w <= 0 || h <= 0 || (w & (w - 1)) || (h & (h - 1)) || rgba == NULL) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
         return;
