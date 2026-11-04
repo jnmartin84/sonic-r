@@ -594,6 +594,35 @@ void R_DrawTriFan(const RenderVertex *v, int count)
 
     R_FlushState();
 #ifdef SONICR_XBOX
+    {
+        /* Black-flash hunt: bad coordinates, or a big dark polygon. */
+        static int s_flashLog;
+        float x0 = 1e30f, x1 = -1e30f, y0 = 1e30f, y1 = -1e30f;
+        int bad = 0, dark = 1;
+        for (int i = 0; i < count; i++) {
+            float x = v[i].sx, y = v[i].sy;
+            if (!(x > -1e7f && x < 1e7f && y > -1e7f && y < 1e7f)) bad = 1;
+            if (x < x0) x0 = x;
+            if (x > x1) x1 = x;
+            if (y < y0) y0 = y;
+            if (y > y1) y1 = y;
+            if ((((v[i].color >> 16) & 0xFF) > 0x30) || (((v[i].color >> 8) & 0xFF) > 0x30) ||
+                ((v[i].color & 0xFF) > 0x30) || ((v[i].color >> 24) < 0x80))
+                dark = 0;
+        }
+        if (!bad) {
+            float cx0 = x0 < 0 ? 0 : x0, cx1 = x1 > 640 ? 640 : x1;
+            float cy0 = y0 < 0 ? 0 : y0, cy1 = y1 > 480 ? 480 : y1;
+            float area = (cx1 > cx0 && cy1 > cy0) ? (cx1 - cx0) * (cy1 - cy0) : 0.0f;
+            if (dark && area > 0.25f * 640.0f * 480.0f) bad = 2;
+        }
+        if (bad && s_flashLog < 40) {
+            s_flashLog++;
+            fprintf(stderr, "FLASHPOLY(%d) tpage %d n=%d frame-mark box=(%d,%d)-(%d,%d) color=%08x blend=%d depth=%d\n", bad,
+                    s_desired.textureId, count, (int)x0, (int)y0, (int)x1, (int)y1, (unsigned)v[0].color,
+                    s_desired.blendMode, s_desired.depthTest);
+        }
+    }
     if (g_dbgMode == 4 && (s_desired.textureId == 16 || s_desired.textureId == 17)) {
         return;   /* debug mode 4: hide the playfield grid tiles (tpages 16/17) */
     }
