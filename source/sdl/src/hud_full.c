@@ -634,7 +634,17 @@ void RenderHUD(void)
 
         if (g_trackId != TRACK_RADIANT_EMERALD) {
             xbox_race_mark("HUD RenderWaterReflectionD3D");
+#ifdef SONICR_XBOX
+            /* Same ground-layer rule as the playfield grid below: drawn before
+             * the track, so it must not write depth that the track would then
+             * z-fight with. */
+            R_PushState();
+            R_SetDepthWrite(0);
             RenderWaterReflectionD3D((int)vp);
+            R_PopState();
+#else
+            RenderWaterReflectionD3D((int)vp);
+#endif
         }
 
         if (g_trackId != TRACK_RADIANT_EMERALD) {

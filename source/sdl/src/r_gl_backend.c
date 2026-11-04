@@ -610,7 +610,7 @@ void R_DrawTriFan(const RenderVertex *v, int count)
         if (mx > 0.0f && mx > mn * 40.0f) {
             static int s_wideLog, s_wideAll;
             g_dbgWideW++;
-            if (s_wideLog < 40 && (s_wideAll++ % 400) == 0) {   /* sampled across the run */
+            if (s_wideLog < 0 && (s_wideAll++ % 400) == 0) {   /* sampled across the run */
                 s_wideLog++;
                 fprintf(stderr, "widew tpage %d n=%d ratio=%d:", s_desired.textureId, count, (int)(mx / mn));
                 for (int k = 0; k < count && k < 4; k++)
@@ -626,7 +626,7 @@ void R_DrawTriFan(const RenderVertex *v, int count)
             g_dbgBigQuads++;
             if (s_desired.textureId != 15 && s_desired.textureId != 52) {
                 static int s_bigLog;
-                if (s_bigLog < 40) {
+                if (s_bigLog < 0) {
                     s_bigLog++;
                     fprintf(stderr, "bigquad tpage %d n=%d:", s_desired.textureId, count);
                     for (int k = 0; k < count && k < 4; k++)

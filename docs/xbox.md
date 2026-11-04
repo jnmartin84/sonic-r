@@ -118,9 +118,10 @@ image pillarboxed in the middle; otherwise it falls back to 640x480.
   `SONICR.LOG` shows the free memory at several points.
 - Rendering relies on pbgl's fixed-function path; any texture or blend mode it
   does not implement will look wrong rather than crash.
-- Known visual bugs: stretched or missing floor textures on some tracks
-  (Factory), brief black flashes, and a texture that sometimes disappears.
-  Under investigation.
+- Known visual bugs: rare brief black/blue flashes, and a texture (the "dog")
+  that sometimes disappears. Under investigation. The streaky, stretched floor
+  seen on Factory is fixed: the playfield grid (and water reflection) no longer
+  write depth, so they cannot z-fight with the track surface.
 
 ## Credits
 
