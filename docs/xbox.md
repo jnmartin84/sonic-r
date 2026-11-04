@@ -2,9 +2,11 @@
 
 *Back to the [README](../README.md).*
 
-> **Status: builds, not yet verified on real hardware or xemu.** The XBE links
-> and the ISO is produced, but nobody has booted it yet. Expect to find bugs.
-> Reports with the on-screen error or a serial/debug log are very welcome.
+> **Status: runs on real hardware** (tested by XadPT on an original Xbox).
+> Menus, races, audio, saves and the in-game reset work. Performance is good,
+> with a 30 fps cap even at the longest draw distance. Some visual bugs remain,
+> see [Known limitations](#known-limitations). Reports with `SONICR.LOG` are very
+> welcome.
 
 > **You supply your own game data.** This build is only the game engine. It
 > contains none of Sonic R's assets. You must own the 1998 PC release.
@@ -18,7 +20,7 @@ The desktop SDL2 sources in `source/sdl/src` are reused as they are, with a few
 |------------------|--------------------------------------------------------------------------|
 | Toolchain        | [nxdk](https://github.com/XboxDev/nxdk) (clang + lld, SDL2 port)          |
 | Graphics         | [pbgl](https://github.com/Ryzee119/pbgl): OpenGL 1.x on the NV2A GPU      |
-| Textures         | RGBA8 upload (same path as the big-endian build; pbgl has no RGB565)     |
+| Textures         | RGBA8 upload (pbgl has no RGB565); 16-bit formats are a possible later saving |
 | Audio            | `src/xbox_mixer.c`, a minimal `SDL_mixer` subset on top of SDL audio      |
 | Input            | SDL GameController (standard mapping)                                    |
 | Game data path   | `D:\`, the folder `default.xbe` was launched from                         |
@@ -80,8 +82,22 @@ folder is writable). If it fails to start, send that file.
 
 ### Saves
 
-`SAVE` and `GHOST` are created next to `default.xbe` on startup. This only works
-if that folder is writable, so run from the hard drive, not from a disc image.
+Saves go to the hard drive in `E:\UDATA\FFFF5352` (the title ID is patched
+into the XBE after the build with `source/xbox/tools/set_titleid.py`).
+
+## Xbox-specific features
+
+- **Exit to Dashboard** is an entry in the options menu.
+- **In-game reset (IGR):** hold left trigger + right trigger + Back + Black for
+  about half a second, in any menu or race, to return to the dashboard.
+- **Controls** page is gamepad only, with Xbox pad mapping. Back cancels a
+  remap. White + Back cycles the debug render mode.
+- **Graphics** page has a Draw Distance setting. Far is the PC maximum and Very
+  Far goes beyond it.
+- The whole build, including nxdk's libraries, is compiled with `-O2`, with a
+  fast `memcpy`/`memset` and a faster texture upload.
+- `SONICR.LOG` starts with the build time of the XBE, so you can tell which
+  build produced it.
 
 ## Video mode
 
