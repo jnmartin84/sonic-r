@@ -1084,18 +1084,19 @@ void platform_gl_swap(void)
             s_backPrev = back;
         }
         {
-            /* X + Back: cycle GPU depth-state experiments 0..3 (see xb_gpu_experiment). */
-            extern void xb_gpu_experiment(int e);
-            extern int xb_gpu_exp;
-            static int s_exPrev;
-            int ex = (s_pads[0].ctrl &&
+            /* R3 (right stick click) + Back: toggle bilinear texture filtering. */
+            extern int g_xbBilinear;
+            extern void R_InvalidateTextureFilters(void);
+            static int s_bfPrev;
+            int bf = (s_pads[0].ctrl &&
                       SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_BACK) &&
-                      SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_X)) ? 1 : 0;
-            if (ex && !s_exPrev) {
-                xb_gpu_experiment((xb_gpu_exp + 1) & 3);
-                xb_logf("GPUEXP -> %d (frame %d)\n", xb_gpu_exp, s_frames);
+                      SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_RIGHTSTICK)) ? 1 : 0;
+            if (bf && !s_bfPrev) {
+                g_xbBilinear = !g_xbBilinear;
+                R_InvalidateTextureFilters();
+                xb_logf("FILTER -> %s (frame %d)\n", g_xbBilinear ? "bilinear" : "nearest", s_frames);
             }
-            s_exPrev = ex;
+            s_bfPrev = bf;
         }
         {
             /* Y + Back: mark "I just saw a flash" in the log (frame + time). */
@@ -1105,7 +1106,7 @@ void platform_gl_swap(void)
                       SDL_GameControllerGetButton(s_pads[0].ctrl, SDL_CONTROLLER_BUTTON_Y)) ? 1 : 0;
             if (mk && !s_mkPrev && s_mkN < 200) {
                 s_mkN++;
-                { extern int xb_gpu_exp; xb_logf("FLASHMARK #%d at frame %d, %u ms (GPUEXP %d)\n", s_mkN, s_frames, (unsigned)SDL_GetTicks(), xb_gpu_exp); }
+                xb_logf("FLASHMARK #%d at frame %d, %u ms\n", s_mkN, s_frames, (unsigned)SDL_GetTicks());
                 {
                     int k;
                     xb_logf("  draws/frame, last 40 frames (oldest first):");

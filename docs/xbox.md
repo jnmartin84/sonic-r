@@ -91,7 +91,8 @@ into the XBE after the build with `source/xbox/tools/set_titleid.py`).
 - **In-game reset (IGR):** hold left trigger + right trigger + Back + Black for
   about half a second, in any menu or race, to return to the dashboard.
 - **Controls** page is gamepad only, with Xbox pad mapping. Back cancels a
-  remap. White + Back cycles the debug render mode.
+  remap. White + Back cycles the debug render mode; Back + Y writes a
+  `FLASHMARK` line to the log (useful to mark the moment of a visual glitch).
 - **Graphics** page has a Draw Distance setting. Far is the PC maximum and Very
   Far goes beyond it.
 - The whole build, including nxdk's libraries, is compiled with `-O2`, with a
@@ -102,6 +103,10 @@ into the XBE after the build with `source/xbox/tools/set_titleid.py`).
   sun panorama rippled by multi-octave noise), as in the PC version. The
   desktop build defaults to a prototype that imitates the old software mode
   (`WATER_RIPPLE_SW` in `render_track_d3d.c`).
+- **Bilinear texture filtering** is on by default, like the retail PC version
+  running on a 3D card (this decompilation point-samples). Back + R3 (click the
+  right stick) toggles it. Colour-keyed texels are stored as transparent black
+  so filtering does not leave a green fringe.
 - **Character select:** locked slots (Eggman included) show the red X with the
   dark outline over the portrait, as the retail PC version does (the colour-keyed
   X in `SCHAR00.RAW`), instead of the additive X variants.

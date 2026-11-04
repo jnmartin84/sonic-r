@@ -133,6 +133,15 @@ static void GL_ApplyTpageFilter(int tp)
     if (want == 0) {
         want = (unsigned char)(s_desired.filter + 1);
     }
+#ifdef SONICR_XBOX
+    /* The retail PC version runs with bilinear filtering everywhere (Direct3D
+     * on a 3D card); this decompilation point-samples. Default to bilinear on
+     * the Xbox (Back + R3 toggles it). */
+    {
+        extern int g_xbBilinear;
+        if (g_xbBilinear) want = (unsigned char)(R_FILTER_LINEAR + 1);
+    }
+#endif
     if (s_glTextureFilter[tp] != want) {
         XB_BEND();
         GLenum f = (want == (unsigned char)(R_FILTER_LINEAR + 1)) ? GL_LINEAR
@@ -478,6 +487,12 @@ void R_DebugGetState(int *depthTest, int *depthWrite, int *depthFunc,
 }
 
 #ifdef SONICR_XBOX
+int g_xbBilinear = 1;
+/* Forget which filter each texture object has, so the next bind re-applies. */
+void R_InvalidateTextureFilters(void)
+{
+    memset(s_glTextureFilter, 0, sizeof(s_glTextureFilter));
+}
 void R_InvalidateBoundTexture(void)
 {
     s_current.textureId = -99;   /* force the next flush to glEnable+glBindTexture */

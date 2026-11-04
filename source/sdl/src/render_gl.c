@@ -221,9 +221,11 @@ static void GL_UploadTpageImpl(int tpage)
             unsigned char g5 = (p >> 6) & 0x1F;
             unsigned char b5 = p & 0x1F;
             unsigned char a = IS_COLOR_KEY_RGB5(r5, g5, b5) ? 0 : 0xFF;
-            out8[i * 4 + 0] = (r5 << 3) | (r5 >> 2);
-            out8[i * 4 + 1] = (g5 << 3) | (g5 >> 2);
-            out8[i * 4 + 2] = (b5 << 3) | (b5 >> 2);
+            /* Keyed texels go transparent BLACK: with bilinear filtering the
+             * key colour would otherwise bleed into edges as a green fringe. */
+            out8[i * 4 + 0] = a ? (r5 << 3) | (r5 >> 2) : 0;
+            out8[i * 4 + 1] = a ? (g5 << 3) | (g5 >> 2) : 0;
+            out8[i * 4 + 2] = a ? (b5 << 3) | (b5 >> 2) : 0;
             out8[i * 4 + 3] = a;
         }
     }
@@ -453,9 +455,9 @@ static void GL_UploadTpageSubRectImpl(int tpage, int destX, int destY, int width
             unsigned char b5 = p & 0x1F;
             unsigned char a = IS_COLOR_KEY_RGB5(r5, g5, b5) ? 0 : 0xFF;
             int idx = (row * width + col) * 4;
-            out8[idx + 0] = (r5 << 3) | (r5 >> 2);
-            out8[idx + 1] = (g5 << 3) | (g5 >> 2);
-            out8[idx + 2] = (b5 << 3) | (b5 >> 2);
+            out8[idx + 0] = a ? (r5 << 3) | (r5 >> 2) : 0;
+            out8[idx + 1] = a ? (g5 << 3) | (g5 >> 2) : 0;
+            out8[idx + 2] = a ? (b5 << 3) | (b5 >> 2) : 0;
             out8[idx + 3] = a;
         }
     }
