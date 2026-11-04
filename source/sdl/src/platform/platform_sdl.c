@@ -17,6 +17,7 @@
 #include <SDL.h>
 #include <SDL_mixer.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include "platform.h"
 #ifdef SONICR_XBOX
@@ -1269,7 +1270,37 @@ void platform_gl_swap(void)
         }
         {
             unsigned ts = (unsigned)SDL_GetTicks();
+            /* pbkit triple buffering can lose a flip: if the frame-ready
+             * interrupt and a VBlank are handled in the same DPC pass, the
+             * VBlank handler marks the buffer as shown although the ISR never
+             * pointed the display at it. The display then stays one buffer
+             * behind, and the next frame starts clearing and drawing into the
+             * buffer that is still on screen -> a black/blue area below the
+             * beam for one refresh (the "black flashes"). Before drawing into
+             * the new back buffer, make sure it is not the one being shown. */
+            #define XB_PCRTC_START (*(volatile unsigned *)0xFD600800u)
+            unsigned prevBack = (unsigned)(uintptr_t)pb_back_buffer() & 0x03FFFFFFu;
             pbgl_swap_buffers();
+            {
+                static int s_fixLog;
+                unsigned back = (unsigned)(uintptr_t)pb_back_buffer() & 0x03FFFFFFu;
+                if ((XB_PCRTC_START & 0x03FFFFFFu) == back) {
+                    int n = 0, forced = 0;
+                    while ((XB_PCRTC_START & 0x03FFFFFFu) == back && n < 3) {
+                        pb_wait_for_vbl();
+                        n++;
+                    }
+                    if ((XB_PCRTC_START & 0x03FFFFFFu) == back) {
+                        XB_PCRTC_START = prevBack;   /* show the frame we just finished */
+                        forced = 1;
+                    }
+                    if (s_fixLog < 60) {
+                        s_fixLog++;
+                        xb_logf("FLIPFIX frame %d: back buffer was on screen (waited %d vbl%s)\n", (int)g_xbFrames, n,
+                                forced ? ", forced flip" : "");
+                    }
+                }
+            }
             if (g_dbgSwapAcc) *g_dbgSwapAcc += (unsigned)SDL_GetTicks() - ts;
         }
         s_pbStart = pb_begin();
