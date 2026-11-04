@@ -495,6 +495,11 @@ static void RenderButtonPrompt_D3D(void)
     if (g_netGameStarted == 0) {
         return;
     }
+#ifdef SONICR_XBOX
+    /* The F5 prompt's action (MODE A/B) is disabled, and there is no F5 on
+     * the pad: don't advertise it. */
+    return;
+#endif
 
     DrawTexturedQuad(screenX, screenY2,  /* EAX=56, EDX=280 */
         0x43FA0000,

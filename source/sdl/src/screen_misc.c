@@ -5627,6 +5627,11 @@ int NetworkScreen(void)
         if (ns_lobbyState < 2) {
             goto skip_text_entry;
         }
+#ifdef SONICR_XBOX
+        /* No keyboard: the lobby's typed-message line would only collect the
+         * pad's A presses as empty messages (rows of 'a' glyphs). */
+        goto skip_text_entry;
+#endif
 
         /* Confirm: submit selection */
         if (g_inputBits & 0x02) {                               /* A/confirm — was RETURN(0x1C) at 0x6758E8 */
@@ -6567,6 +6572,9 @@ int NetworkScreenReentry(void)
         if (ns_lobbyState < 2) {
             goto skip_text_entry_re;
         }
+#ifdef SONICR_XBOX
+        goto skip_text_entry_re;   /* no keyboard: see the main lobby */
+#endif
 
         if (g_inputBits & 0x02) {
             if (inputThrottle == 0) {
