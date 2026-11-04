@@ -1139,6 +1139,24 @@ void platform_gl_swap(void)
             s_prevSum = sum;
             (void)s_lastLow;
         }
+        {
+            /* Static-scene check: once the per-tpage vertex hashes have been
+             * identical for 30 frames (pause / standing still), log any frame
+             * where some of them change, and which tpages. */
+            extern unsigned g_dbgVtxHash[54];
+            static unsigned s_prevH[54];
+            static int s_still, s_vcLog;
+            int nch = 0;
+            for (int t = 0; t < 54; t++) if (g_dbgVtxHash[t] != s_prevH[t]) nch++;
+            if (nch && s_still >= 30 && s_vcLog < 80) {
+                s_vcLog++;
+                xb_logf("VTXCHANGE frame %d (still for %d frames), tpages:", s_frames, s_still);
+                for (int t = 0; t < 54; t++) if (g_dbgVtxHash[t] != s_prevH[t]) xb_logf(" %d", t - 1);
+                xb_logf("\n");
+            }
+            s_still = nch ? 0 : s_still + 1;
+            for (int t = 0; t < 54; t++) { s_prevH[t] = g_dbgVtxHash[t]; g_dbgVtxHash[t] = 0; }
+        }
         if (s_frames <= 3 || s_frames % 600 == 0)
             xb_logf("frame %d\n", s_frames);
         {

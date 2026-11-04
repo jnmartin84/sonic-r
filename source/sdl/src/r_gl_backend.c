@@ -103,6 +103,7 @@ extern GLuint s_glTextures[];       /* render_gl.c */
 #ifdef SONICR_XBOX
 extern void xb_batch_end(void);
 extern void xb_draw_fan(const float *verts, int n);
+extern void xb_tex_audit(int tpage);
 #define XB_BEND() xb_batch_end()
 #else
 #define XB_BEND() ((void)0)
@@ -527,6 +528,7 @@ static inline void R_EmitVertex(const RenderVertex *v)
 /* Per-tpage draw statistics for on-hardware debugging (see platform_gl_swap). */
 int   g_dbgMode;     /* Back button cycles 0..4 for on-hardware experiments */
 int   g_dbgDraws[53];
+unsigned g_dbgVtxHash[54];   /* [tpage + 1], reset every frame */
 int   g_dbgBigQuads;   /* draws with a vertex far outside the screen */
 float g_dbgVert[53][6];
 #endif
@@ -728,6 +730,19 @@ void R_DrawTriFan(const RenderVertex *v, int count)
             o[6] = (float)((argb      ) & 0xFF) * k;
             o[7] = (float)((argb >> 24) & 0xFF) * k;
             o[8] = v[i].u;  o[9] = v[i].v;
+        }
+        xb_tex_audit(s_desired.textureId);
+        {
+            /* Flash hunt: hash of everything sent to the GPU, per tpage. In a
+             * paused (static) scene it must not change from frame to frame. */
+            extern unsigned g_dbgVtxHash[54];
+            const unsigned *w = (const unsigned *)buf;
+            int hi = (s_desired.textureId >= -1 && s_desired.textureId <= 52) ? s_desired.textureId + 1 : 0;
+            unsigned h = g_dbgVtxHash[hi];
+            for (int k = 0; k < count * 10; k++) h = ((h << 5) | (h >> 27)) ^ w[k];
+            h = ((h << 5) | (h >> 27)) ^ ((unsigned)s_desired.blendMode << 8 | (unsigned)s_desired.depthTest << 4 |
+                                         (unsigned)s_desired.depthWrite);
+            g_dbgVtxHash[hi] = h;
         }
         xb_draw_fan(buf, count);
         return;
