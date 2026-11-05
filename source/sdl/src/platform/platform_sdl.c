@@ -1165,22 +1165,7 @@ void platform_gl_swap(void)
             if (s_frames % 600 != 1 && sum >= s_prevSum) {
                 unsigned d = sum - s_prevSum;
                 s_dhist[s_frames & 63] = d;
-                if (s_frames > 200 && s_avg > 300 && d * 3 < s_avg) {
-                    static int s_lowN;
-                    if (++s_lowN <= 60) {
-                        xb_logf("LOWDRAW frame %d: %u draws (avg %u), mark %s; tpage good->now:", s_frames, d, s_avg,
-                                (const char *)g_lastMark);
-                        for (int t = 0; t < 53; t++)
-                            if (s_goodT[t] > curT[t] + 20) xb_logf(" %d:%u->%u", t, s_goodT[t], curT[t]);
-                        xb_logf("\n");
-                        {
-                            extern int s_xbStatePrev[20], s_xbStatePrevOk;
-                            int cur[20];
-                            xb_capture_state(cur);
-                            if (s_xbStatePrevOk) xb_log_state("  prev ", s_xbStatePrev);
-                            xb_log_state("  now  ", cur);
-                        }
-                    }
+                if (0) {   /* LOWDRAW logging retired: the black flashes were lost flips */
                 }
                 else {
                     for (int t = 0; t < 53; t++) s_goodT[t] = curT[t];

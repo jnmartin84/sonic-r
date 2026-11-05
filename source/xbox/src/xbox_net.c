@@ -33,6 +33,14 @@ static int SDLCALL xbox_net_thread(void *arg)
 {
     (void)arg;
     int r = nxNetInit(NULL);
+    if (r == -2 && g_pnetif) {
+        /* nxNetInit gives DHCP only ten seconds; the interface is up and lwIP
+         * keeps asking, so the lease often arrives a little later. */
+        for (int i = 0; i < 50 && ip4_addr_isany_val(*netif_ip4_addr(g_pnetif)); i++) {
+            SDL_Delay(1000);
+        }
+        if (!ip4_addr_isany_val(*netif_ip4_addr(g_pnetif))) r = 0;
+    }
     if (r == 0 && g_pnetif && !ip4_addr_isany_val(*netif_ip4_addr(g_pnetif))) {
         char ip[16], gw[16], dns0[16];
         snprintf(ip, sizeof(ip), "%s", ip4addr_ntoa(netif_ip4_addr(g_pnetif)));
