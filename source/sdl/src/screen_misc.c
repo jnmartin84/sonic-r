@@ -4693,6 +4693,20 @@ static int s_pickerPrevState = -1;
 /* Convert a C string to the in-game-font glyph-ID array.
  * Mapping: a-z/A-Z → 0..25, 0-9 → 26..35.  Other chars are skipped.
  * Writes a -1 sentinel after the last glyph.  Returns glyph count. */
+/* On-screen key hints of the network screens. The lobby's actions are PC
+ * F-keys; on the Xbox the pad drives them (see NetSynthPadKeys). */
+#ifdef SONICR_XBOX
+#define NETTXT_LAN_PROMPT   "PRESS Y FOR LAN PLAY"
+#define NETTXT_HOST         "PRESS A TO HOST"
+#define NETTXT_JOIN         "PRESS RT TO JOIN"
+#define NETTXT_PICKER_HINT  "UP/DOWN SELECT - A JOIN - Y LAN - B BACK"
+#else
+#define NETTXT_LAN_PROMPT   "PRESS F3 FOR LAN PLAY"
+#define NETTXT_HOST         "PRESS F1 TO HOST"
+#define NETTXT_JOIN         "PRESS F2 TO JOIN"
+#define NETTXT_PICKER_HINT  "UP/DOWN SELECT - ENTER JOIN - F3 LAN - ESC BACK"
+#endif
+
 static int StringToGlyphIds(const char *s, int *out, int maxOut)
 {
     int n = 0;
@@ -4879,7 +4893,7 @@ static void RenderSignInScreen(const uint8_t *qrBuf, int qrSize,
     }
 
     {
-        const char *prompt = "PRESS F3 FOR LAN PLAY";
+        const char *prompt = NETTXT_LAN_PROMPT;
         int pixSz = 3;
         int charW = 5 * pixSz + pixSz;
         int pLen = 0;
@@ -5541,7 +5555,11 @@ int NetworkScreen(void)
                             PlaySoundEffect(1, 0, 0);
                         }
                     }
+#ifdef SONICR_XBOX
+                    if (newPress & 0x0A) {                     /* Start or A = Enter */
+#else
                     if (newPress & 0x08) {                     /* Start = Enter */
+#endif
                         extern const char *g_cmdHostIP;
                         MatchmakerSession *ms = &g_mmSessionList.sessions[s_pickerCursor];
                         g_cmdHostIP = ms->ip_address;
@@ -6023,8 +6041,8 @@ render_frame:
                 }
 
                 if (ns_lobbyState == 0) {
-                    const char *l1 = "PRESS F1 TO HOST";
-                    const char *l2 = "PRESS F2 TO JOIN";
+                    const char *l1 = NETTXT_HOST;
+                    const char *l2 = NETTXT_JOIN;
                     int w1 = PixTextWidth(l1, 4);
                     int w2 = PixTextWidth(l2, 4);
                     DrawPixText(l1, (640 - w1) / 2, 200, 4, 0xFFFFFFFF);
@@ -6180,7 +6198,7 @@ render_frame:
                     }
                 }
 
-                const char *hint = "UP/DOWN SELECT - ENTER JOIN - F3 LAN - ESC BACK";
+                const char *hint = NETTXT_PICKER_HINT;
                 int hintW = PixTextWidth(hint, 2);
                 DrawPixText(hint, (640 - hintW) / 2, 440, 2, 0xC0C0C0C0);
             }
@@ -6877,8 +6895,8 @@ render_frame_re:
                 }
 
                 if (ns_lobbyState == 0) {
-                    const char *l1 = "PRESS F1 TO HOST";
-                    const char *l2 = "PRESS F2 TO JOIN";
+                    const char *l1 = NETTXT_HOST;
+                    const char *l2 = NETTXT_JOIN;
                     int w1 = PixTextWidth(l1, 4);
                     int w2 = PixTextWidth(l2, 4);
                     DrawPixText(l1, (640 - w1) / 2, 200, 4, 0xFFFFFFFF);

@@ -132,7 +132,10 @@ UDP directly between the consoles/PCs, with UPnP to open the host's port.
   track, B back. The on-screen hints show these Xbox buttons: the PC key names
   painted into `NET00.RAW` are replaced when the file is loaded (a patched copy
   is written to UDATA; `source/xbox/tools/make_net00_patch.py` builds the
-  patch). There is no typed lobby chat (no keyboard). The host needs at least
+  patch), and the text prompts ("PRESS A TO HOST", "PRESS RT TO JOIN", the
+  session list hint) name the pad buttons too. In the online session list,
+  D-pad up/down selects and A or Start joins. There is no typed lobby chat
+  (no keyboard). The host needs at least
   one other player to start a race.
 - The console registers as platform `xbox`.
 
