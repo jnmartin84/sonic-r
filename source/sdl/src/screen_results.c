@@ -134,6 +134,16 @@ void RenderResultsScreen(int screenMode, int playerOffset)
 {
     int baseY = 0x1c2;                              /* esi = 450 */
     int baseX = 0xa;                                 /* edi = 10 */
+#ifdef SONICR_XBOX
+    /* TV overscan: the PC layout puts the "Esc..." header 6 px and the text
+     * lines 10 px from the left edge, which a TV crops. Keep them inside the
+     * title-safe area. */
+    const int safeX = 24, safeY = 14;
+    baseX += safeX - 0xa;
+    baseY -= safeY;
+#else
+    const int safeX = 0, safeY = 0;
+#endif
     int dataOffset = playerOffset * 12;              /* [ebp-0x20] */
     int tpage = g_uiTexPage + 1;                     /* ecx */
     int frameByteOff = (g_totalFrames & 0x3f) << 8;  /* edx */
@@ -152,7 +162,7 @@ void RenderResultsScreen(int screenMode, int playerOffset)
               | ((unsigned int)v << 8)
               | (unsigned int)v;
 
-    DrawTexturedQuad(6, 6,           /* EAX=6, EDX=6 */
+    DrawTexturedQuad(6 + safeX, 6 + safeY,  /* EAX=6, EDX=6 */
         0x43FA0000,                  /* depth = 500.0f */
         0x48, 0x1a,                  /* width=72, height=26 */
         tpage,
@@ -238,7 +248,7 @@ void RenderResultsScreen(int screenMode, int playerOffset)
         baseY -= 0x1a;                                     /* esi -= 0x1a */
         ptr = (char *)g_resultsPlayerData + 0x108;          /* edi = 0x689bb8 + 0x108 */
         for (int i = 1; i <= g_resultsPlayerCount; i++) {
-            DrawGlyphString(0xc, baseY, (int *)ptr, 0x40);  /* EAX=0xc, EDX=esi */
+            DrawGlyphString(0xc + safeX, baseY, (int *)ptr, 0x40);  /* EAX=0xc, EDX=esi */
             baseY -= 0x16;                                   /* esi -= 0x16 */
             ptr += 0x104;                                    /* edi += 0x104 */
         }
