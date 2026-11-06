@@ -447,17 +447,22 @@ int platform_init(int width, int height, int fullscreen, const char *title)
     (void)fullscreen;
     (void)title;
     {
-        /* Default: the game's native 640x480 (480p/480i, whatever the dashboard
-         * picks). 720p costs several MB more video memory, so it is opt-in:
-         * D:\VIDEO.TXT starting with '7' asks for 1280x720 (if the dashboard allows).
-         * The renderer pillarboxes the 4:3 image inside whatever size is set. */
-        int want720 = 0;
+        /* Follow the dashboard: if 720p is enabled there (component/HD cable
+         * with the 720p box ticked), run at 1280x720 - the 4:3 image is
+         * pillarboxed and the renderer scales to it. D:\VIDEO.TXT can
+         * override: '4' forces 640x480, '7' asks for 720p. */
+        DWORD enc = XVideoGetEncoderSettings();
+        int want720 = (enc & VIDEO_MODE_720P) ? 1 : 0;
         FILE *cfg = fopen("D:\\VIDEO.TXT", "r");
         if (cfg) {
             int c = fgetc(cfg);
             if (c == '7') want720 = 1;
+            if (c == '4') want720 = 0;
             fclose(cfg);
         }
+        fprintf(stderr, "video: dashboard settings 0x%08lx (720p %s, 480p %s, widescreen %s)\n",
+                (unsigned long)enc, (enc & VIDEO_MODE_720P) ? "on" : "off",
+                (enc & VIDEO_MODE_480P) ? "on" : "off", (enc & VIDEO_WIDESCREEN) ? "on" : "off");
         if (want720 && XVideoSetMode(1280, 720, 32, REFRESH_DEFAULT)) {
             width = 1280;
             height = 720;
@@ -470,6 +475,7 @@ int platform_init(int width, int height, int fullscreen, const char *title)
         }
         s_fbWidth = width;
         s_fbHeight = height;
+        fprintf(stderr, "video: running at %dx%d\n", width, height);
     }
     if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());

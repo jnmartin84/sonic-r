@@ -19,6 +19,7 @@
 #endif
 
 #include "r_types.h"
+void platform_get_drawable_size(int *w, int *h);   /* platform.h */
 #include "r_state.h"
 #include "r_draw.h"
 #include "r_texture.h"
@@ -321,6 +322,7 @@ void R_FlushState(void)
      * simply a full-screen rectangle. s_current holds the effective values. */
     {
         int ex = 0, ey = 0, ew = 640, eh = 480;
+        platform_get_drawable_size(&ew, &eh);   /* whole framebuffer (1280x720 in 720p) */
         if (s_desired.scissorEnabled) {
             ex = s_desired.scissorX;
             ey = s_desired.scissorY;
