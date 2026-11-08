@@ -954,7 +954,6 @@ static int xb_watchdog(void *arg)
     return 0;
 }
 void xbox_start_watchdog(void) { SDL_CreateThread(xb_watchdog, "watchdog", NULL); }
-#endif
 
 
 /* Buffered diagnostics: unbuffered fprintf to the HDD stalls a frame by ~150 ms,
@@ -1029,7 +1028,7 @@ static void xb_log_state(const char *tag, const int *v)
             v[15], v[16], v[17], v[18], v[19]);
 }
    /* draws per frame, indexed by frame & 63 */
-#ifdef SONICR_XBOX
+/* (still inside the SONICR_XBOX block opened above) */
 /* Timestamped event note for the log (first 80), used to line events up with
  * what is seen on screen. */
 void xb_note(const char *what)

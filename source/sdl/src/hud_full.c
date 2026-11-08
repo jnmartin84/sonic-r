@@ -22,6 +22,13 @@ extern void Pad448_Draw(void);   /* dc/src/pad448.c */
 #include <string.h>
 #include <math.h>
 
+/* Rain diagnostics counters (logged by the Xbox build, see platform_sdl.c). */
+#ifdef SONICR_XBOX
+extern int g_dbgRainActive, g_dbgRainDrawn, g_dbgRainRejected;
+#else
+static int g_dbgRainActive, g_dbgRainDrawn, g_dbgRainRejected;
+#endif
+
 /* Digit sprite UV layout on g_tpageParallax1:
  *   Large digits: (digit*8 + baseX, 0x88), size 8×16 each
  *   Small digits: (digit*8 + baseX, 0x92+yoff), size 8×3 each
@@ -2291,7 +2298,6 @@ void DrawGroundParticlesD3D(int vpIdx)
     for (int slot = 0; slot < 16; slot++) {
         GroundParticle *gp = &g_particleSlots[slot];
         int tpage = g_tpageParallax1;
-        extern int g_dbgRainActive, g_dbgRainDrawn, g_dbgRainRejected;
 
         if (g_renderStateBlock[slot] == 0) {
             continue;
