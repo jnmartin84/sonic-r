@@ -248,6 +248,48 @@ int CreateNetworkSession(const char *name, const char *password)
 }
 
 /* 0x4870A8 — Client: discover host via broadcast, then connect */
+/* Client join bookkeeping (see NetClientJoinTick). */
+static char  s_joinHostIp[64];
+static DWORD s_joinStartMs, s_joinLastReqMs, s_joinLastDiscMs;
+static int   s_joinLanTried;
+
+static void SendJoinRequest(void)
+{
+    /* Join request so host assigns us a slot.  Payload carries our
+     * matchmaker username so the host (and via SLOT_ASSIGN/PEER_NAME, the
+     * other clients) can populate the decoration table with real names. */
+    struct {
+        int     hdr;
+        char    name[MM_MAX_USERNAME];
+        char    platform[16];
+        uint8_t region;
+    } joinReq;
+    memset(&joinReq, 0, sizeof(joinReq));
+    joinReq.hdr = NET_MSG_JOIN_REQ;
+    const char *uname = MatchmakerGetUsername();
+    if (uname == NULL) {
+        uname = "";
+    }
+    strncpy(joinReq.name, uname, MM_MAX_USERNAME - 1);
+    strncpy(joinReq.platform, MM_PLATFORM, sizeof(joinReq.platform) - 1);
+    joinReq.region = (uint8_t)platform_get_region();
+    net_send_to_host(&joinReq, sizeof(joinReq));
+    s_joinLastReqMs = timeGetTime();
+}
+
+static int JoinHostIp(const char *hostIp)
+{
+    if (net_client_connect(hostIp, NET_PORT_DEFAULT) != 0) {
+        return 0;
+    }
+    strncpy(s_joinHostIp, hostIp, sizeof(s_joinHostIp) - 1);
+    s_joinHostIp[sizeof(s_joinHostIp) - 1] = '\0';
+    SendJoinRequest();
+    DebugLog("Joined session at %s:%d as '%s'\n", hostIp, NET_PORT_DEFAULT,
+             MatchmakerGetUsername() ? MatchmakerGetUsername() : "");
+    return 1;
+}
+
 int JoinNetworkSession(const char *name, int enumIdx)
 {
     (void)name; (void)enumIdx;
@@ -266,30 +308,60 @@ int JoinNetworkSession(const char *name, int enumIdx)
         }
     }
 
-    if (net_client_connect(hostIp, NET_PORT_DEFAULT) == 0) {
-        /* Send join request so host assigns us a slot.  Payload carries our
-         * matchmaker username so the host (and via SLOT_ASSIGN/PEER_NAME, the
-         * other clients) can populate the decoration table with real names. */
-        struct {
-            int     hdr;
-            char    name[MM_MAX_USERNAME];
-            char    platform[16];
-            uint8_t region;
-        } joinReq;
-        memset(&joinReq, 0, sizeof(joinReq));
-        joinReq.hdr = NET_MSG_JOIN_REQ;
-        const char *uname = MatchmakerGetUsername();
-        if (uname == NULL) {
-            uname = "";
-        }
-        strncpy(joinReq.name, uname, MM_MAX_USERNAME - 1);
-        strncpy(joinReq.platform, MM_PLATFORM, sizeof(joinReq.platform) - 1);
-        joinReq.region = (uint8_t)platform_get_region();
-        net_send_to_host(&joinReq, sizeof(joinReq));
-        DebugLog("Joined session at %s:%d as '%s'\n", hostIp, NET_PORT_DEFAULT, joinReq.name);
+    if (JoinHostIp(hostIp)) {
+        s_joinStartMs = s_joinLastReqMs;
+        s_joinLastDiscMs = 0;
+        s_joinLanTried = 0;
         return 1;
     }
     DebugLog("JoinNetworkSession: connect failed\n");
+    return 0;
+}
+
+/* Called every lobby frame while we are a client. UDP gives no "connected"
+ * signal, so until the host answers with SLOT_ASSIGN:
+ *  - resend JOIN_REQ every second (a single lost packet used to leave the
+ *    client in the lobby forever, invisible to the host);
+ *  - after 3 s with no answer, also look for a host on the local network.
+ *    A session listed by the matchmaker carries the host's public address,
+ *    and many home routers don't loop traffic for their own public address
+ *    back inside (no NAT hairpinning), so two machines in the same house
+ *    could see the session but never reach it. If a LAN host answers, join it
+ *    directly.
+ * Returns 1 joined (or not a client), 0 still waiting, -1 gave up (12 s). */
+int NetClientJoinTick(void)
+{
+    extern int NetClientHasSlot(void);
+    if (!net_is_active() || net_is_host() || NetClientHasSlot()) {
+        return 1;
+    }
+    DWORD now = timeGetTime();
+    if (now - s_joinLastReqMs >= 1000) {
+        SendJoinRequest();
+    }
+    if (!s_joinLanTried && now - s_joinStartMs >= 3000) {
+        char lanIp[64];
+        if (now - s_joinLastDiscMs >= 500) {
+            net_discover_send(NET_PORT_DEFAULT);
+            s_joinLastDiscMs = now;
+        }
+        if (net_discover_check(lanIp, sizeof(lanIp)) == 1) {
+            s_joinLanTried = 1;
+            if (strcmp(lanIp, s_joinHostIp) != 0) {
+                DebugLog("Join: no reply from %s, found a host on the LAN at %s - joining it\n",
+                         s_joinHostIp, lanIp);
+                JoinHostIp(lanIp);
+            }
+        }
+        else if (now - s_joinStartMs >= 8000) {
+            s_joinLanTried = 1;
+            DebugLog("Join: no reply from %s and no host on the LAN\n", s_joinHostIp);
+        }
+    }
+    if (now - s_joinStartMs >= 12000) {
+        DebugLog("Join: host %s never answered - giving up\n", s_joinHostIp);
+        return -1;
+    }
     return 0;
 }
 

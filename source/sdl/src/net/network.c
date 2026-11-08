@@ -277,6 +277,7 @@ static uint8_t s_netSlotRegion[NET_MAX_PLAYERS];
 /* Client: 1 once we've received SLOT_ASSIGN from the host. Gates client→host
  * sends so we don't spray pad packets at a host that hasn't accepted us. */
 static int s_haveSlotAssign = 0;
+int NetClientHasSlot(void) { return s_haveSlotAssign; }
 
 static DWORD s_lastHostPacketMs = 0;
 

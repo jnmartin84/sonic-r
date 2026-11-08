@@ -5622,6 +5622,20 @@ int NetworkScreen(void)
          * and dial via DirectPlay modem service provider. Not relevant
          * for cross-platform networking. */
 
+        /* Client still waiting for the host's SLOT_ASSIGN: resend the join
+         * request, fall back to a LAN host, or give up and go back. */
+        if (ns_lobbyState == 2 && ns_setupMode == 2) {
+            extern int NetClientJoinTick(void);
+            if (NetClientJoinTick() < 0) {
+                extern const char *g_cmdHostIP;
+                CloseDirectPlaySession();
+                g_cmdHostIP = NULL;
+                NetDbgPush("HOST DID NOT ANSWER");
+                PlaySoundEffect(0, 0, 0);
+                ns_lobbyState = MatchmakerHasToken() ? 3 : 1;
+            }
+        }
+
         /* STATE 2: In lobby — character selection & sync */
         if (ns_lobbyState == 2) {                              /* 0x48B118 */
             /* Periodically re-enumerate sessions */
