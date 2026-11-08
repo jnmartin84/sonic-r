@@ -252,6 +252,15 @@ int CreateNetworkSession(const char *name, const char *password)
 static char  s_joinHostIp[64];
 static DWORD s_joinStartMs, s_joinLastReqMs, s_joinLastDiscMs;
 static int   s_joinLanTried;
+static DWORD s_joinTimeoutMs = 12000;
+/* Role in the last network race (1 host, 2 client), so that after the race
+ * NetworkScreenReentry can put both players straight back into the lobby. */
+int g_netLastRole;
+
+void NetClientJoinSetTimeout(int ms) { s_joinTimeoutMs = (DWORD)ms; }
+/* Address actually joined last (may be the LAN address found by the
+ * fallback); used to rejoin the same host after a race. */
+const char *NetLastJoinedHost(void) { return s_joinHostIp[0] ? s_joinHostIp : NULL; }
 
 static void SendJoinRequest(void)
 {
@@ -282,8 +291,10 @@ static int JoinHostIp(const char *hostIp)
     if (net_client_connect(hostIp, NET_PORT_DEFAULT) != 0) {
         return 0;
     }
-    strncpy(s_joinHostIp, hostIp, sizeof(s_joinHostIp) - 1);
-    s_joinHostIp[sizeof(s_joinHostIp) - 1] = '\0';
+    if (hostIp != s_joinHostIp) {
+        strncpy(s_joinHostIp, hostIp, sizeof(s_joinHostIp) - 1);
+        s_joinHostIp[sizeof(s_joinHostIp) - 1] = '\0';
+    }
     SendJoinRequest();
     DebugLog("Joined session at %s:%d as '%s'\n", hostIp, NET_PORT_DEFAULT,
              MatchmakerGetUsername() ? MatchmakerGetUsername() : "");
@@ -312,6 +323,7 @@ int JoinNetworkSession(const char *name, int enumIdx)
         s_joinStartMs = s_joinLastReqMs;
         s_joinLastDiscMs = 0;
         s_joinLanTried = 0;
+        s_joinTimeoutMs = 12000;
         return 1;
     }
     DebugLog("JoinNetworkSession: connect failed\n");
@@ -358,7 +370,7 @@ int NetClientJoinTick(void)
             DebugLog("Join: no reply from %s and no host on the LAN\n", s_joinHostIp);
         }
     }
-    if (now - s_joinStartMs >= 12000) {
+    if (now - s_joinStartMs >= s_joinTimeoutMs) {
         DebugLog("Join: host %s never answered - giving up\n", s_joinHostIp);
         return -1;
     }
@@ -1985,6 +1997,7 @@ post_race_non_gp: /* 0x4cf93a */
 post_race_dispatch:
 
     if (g_netSessionActive != 0 || g_isNetworkGame != 0) {
+        g_netLastRole = net_is_active() ? (net_is_host() ? 1 : 2) : 0;
         g_netSessionActive = 0;
         LoadTrackSinglePlayer();
         CloseDirectPlaySession();

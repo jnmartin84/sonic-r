@@ -137,6 +137,11 @@ UDP directly between the consoles/PCs, with UPnP to open the host's port.
   D-pad up/down selects and A or Start joins; Y there searches the local
   network instead. On the host/join screen, Y hosts a LAN-only game (not listed
   on the matchmaker); an online host (A) can also be joined over the LAN.
+  After a race both players return to the lobby on their own: the host re-hosts
+  and the client rejoins the same address. A client that gets no answer resends
+  its join request every second and, after 3 s, looks for the host on the local
+  network (routers often can't reach their own public address from inside), so
+  two machines in the same house can join each other from the online list.
   There is no typed lobby chat
   (no keyboard). The host needs at least
   one other player to start a race.

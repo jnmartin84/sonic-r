@@ -66,11 +66,13 @@ void ComputeRacePositions(int playerIdx)
     int dz = wpData[2] - ((-player->posZ) >> 12);     /* 0x481349-0x481356 */
 
     /* Progress = waypoint index * 0x200000 + sub-waypoint distance.
-       Remote players don't run sector physics so lapCrossFlag is stale —
-       use lapsCompleted directly for them. */
-    int lapOffset = net_should_run_physics(playerSlot)
-        ? (int)player->lapsCompleted - (int)player->lapCrossFlag
-        : (int)player->lapsCompleted;
+       lapCrossFlag (1 = behind the start/finish line, as on the starting
+       grid) now travels in the network delta (field 14) along with
+       lapsCompleted, so remote players use the same formula as local ones.
+       Using lapsCompleted alone for them counted a remote player who had not
+       yet crossed the line (or had backed over it) as almost a full lap
+       ahead, so the local player could be shown 2nd while clearly 1st. */
+    int lapOffset = (int)player->lapsCompleted - (int)player->lapCrossFlag;
     unsigned int progress = (unsigned int)(nearestWP + lapOffset * g_posDataCount4) * 0x200000 +
                             ((unsigned int)((dx * dx + dz * dz) >> 11) & 0x1FFFFF);
 
@@ -94,10 +96,8 @@ void ComputeRacePositions(int playerIdx)
         }
     }
 
-    /* Don't count before race starts — local player only, remote players
-       don't run sector physics so lapCrossFlag stays at init value */
-    if (net_should_run_physics(playerSlot) &&
-        player->lapsCompleted == 0 && player->lapCrossFlag != 0)
+    /* Don't count before the player first crosses the start line. */
+    if (player->lapsCompleted == 0 && player->lapCrossFlag != 0)
     {
         progress = 0;
     }
@@ -146,6 +146,17 @@ void ComputeRacePositions(int playerIdx)
             continue;
         }
         players[pIdx].racePosition = (short)(i + 1);
+    }
+
+    /* Network races: log the inputs of the ranking every ~10 s so position
+     * disagreements between machines can be diagnosed from the logs. */
+    if (g_isNetworkGame && (g_totalFrames % 300) == 0) {
+        for (int i = 0; i < (int)g_numPlayers && i < 4; i++) {
+            DebugLog("pos: p%d laps %d cross %d progress %u -> %d%s\n", i,
+                     players[i].lapsCompleted, players[i].lapCrossFlag,
+                     (unsigned)players[i].trackProgress, players[i].racePosition,
+                     net_should_run_physics(i) ? " (local)" : "");
+        }
     }
 
 #if DEBUG_GP_FAST_FIRST

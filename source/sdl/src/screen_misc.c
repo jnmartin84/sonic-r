@@ -6327,6 +6327,8 @@ render_frame:
  *   - 6 helper functions at 0x48A554-0x48A7BC
  *   - Reloads lobby tpages from scratch
  */
+static int s_reentryAutoJoin;   /* client rejoining its last host after a race */
+
 int NetworkScreenReentry(void)
 {
     /* ROM table: per-character Y offset for nameplate rendering.
@@ -6574,6 +6576,23 @@ int NetworkScreenReentry(void)
                     lastTickSec = timeGetTime() / 1000;
                     PlaySoundEffect(2, 0, 0);
                 }
+                /* Back from a network race: the host re-hosts and the client
+                 * rejoins the same host on its own, so both land in the lobby
+                 * again instead of on the host/join prompt. */
+                {
+                    extern int g_netLastRole;
+                    extern const char *NetLastJoinedHost(void);
+                    if (g_netLastRole == 1 && g_netProviderChoice == -1) {
+                        g_netProviderChoice = 0;
+                        DebugLog("Reentry: re-hosting automatically\n");
+                    }
+                    else if (g_netLastRole == 2 && NetLastJoinedHost() != NULL && g_netProviderChoice == -1) {
+                        g_netProviderChoice = 1;
+                        s_reentryAutoJoin = 1;
+                        DebugLog("Reentry: rejoining %s automatically\n", NetLastJoinedHost());
+                    }
+                    g_netLastRole = 0;
+                }
             }
             ns_connectionMode = (g_netProviderChoice != -1) ? 1 : 0;
 
@@ -6602,8 +6621,25 @@ int NetworkScreenReentry(void)
                 }
             }
 
-            if (ns_setupMode == 2 && g_resultsUnlockFlag != 0) {
-                if (JoinNetworkSession(NS_STR_JOIN_SESSION, 0) == 1) {
+            if (ns_setupMode == 2 && (g_resultsUnlockFlag != 0 || s_reentryAutoJoin)) {
+                extern const char *g_cmdHostIP;
+                extern const char *NetLastJoinedHost(void);
+                const char *savedHost = g_cmdHostIP;
+                char rejoinIp[64];
+                int joinedNow;
+                if (s_reentryAutoJoin) {
+                    snprintf(rejoinIp, sizeof(rejoinIp), "%s", NetLastJoinedHost());
+                    g_cmdHostIP = rejoinIp;
+                }
+                joinedNow = JoinNetworkSession(NS_STR_JOIN_SESSION, 0);
+                g_cmdHostIP = savedHost;
+                if (joinedNow == 1) {
+                    if (s_reentryAutoJoin) {
+                        /* The host may still be on its results screen. */
+                        extern void NetClientJoinSetTimeout(int ms);
+                        NetClientJoinSetTimeout(90000);
+                        s_reentryAutoJoin = 0;
+                    }
                     ns_lobbyState = 2;
                 }
             }
@@ -6611,6 +6647,17 @@ int NetworkScreenReentry(void)
             if (ns_lobbyState == 2) {
                 EnumNetworkSessions(1);
                 g_netEnumActive = 1;
+            }
+        }
+
+        if (ns_lobbyState == 2 && ns_setupMode == 2) {
+            extern int NetClientJoinTick(void);
+            if (NetClientJoinTick() < 0) {
+                CloseDirectPlaySession();
+                NetDbgPush("HOST DID NOT ANSWER");
+                PlaySoundEffect(0, 0, 0);
+                ns_lobbyState = 0;
+                ns_connectionMode = 0;
             }
         }
 
