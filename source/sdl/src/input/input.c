@@ -327,6 +327,67 @@ int ReadLocalInput(void)
  * Input processing + ghost record/playback
  * ===================================================================== */
 
+/* Start = pause, and the pause menu. Split out of UpdatePerPlayerInput so the
+ * online race loop (which does not run UpdatePerPlayerInput: inputs come from
+ * the network there) can pause too. Online, "Restart" would restart the race
+ * on this machine only, so it just resumes; "Quit" leaves the session right
+ * away (the others are told and keep racing). */
+extern void CloseDirectPlaySession(void);
+void HandlePauseInput(void)
+{
+    int online = (g_netSessionActive != 0 || g_isNetworkGame != 0);
+    /* Pause handling */
+    if ((g_combinedInputState & 0x800) != 0 && g_isPaused == 0 &&
+        g_pauseLatch == 0 && g_fadeState == FADE_VISIBLE &&
+        g_introCountdown == 0 && g_demoMode == DEMO_NONE && g_postRaceCameraMode == 0 &&
+        !NetRaceFrozen())   /* someone else paused us, or the resume countdown */
+    {
+        PlaySoundEffect(0, 0, 0);
+        StopAmbientSounds();
+        g_isPaused = 1;
+        g_pauseLatch = 1;
+    }
+
+    if ((g_combinedInputState & 0x800) == 0 && g_isPaused == 0 && g_pauseLatch == 1) {
+        g_pauseLatch = 0;
+    }
+
+    if (g_isPaused != 0) {
+        int pauseResult = RunPauseMenu();
+        if (pauseResult == 1) {
+            g_isPaused = 0;
+            g_pauseLatch = 1;
+        }
+        else if (pauseResult == 2 && online) {               /* restart: not possible online */
+            g_isPaused = 0;
+            g_pauseLatch = 1;
+        }
+        else if (pauseResult == 2) {                         /* 0x477674: options/restart (selection=1) */
+            g_fadeState = FADE_OUT;                          /* 0x477683: EAX=2 */
+            g_fadeSpeed = 0x10;                              /* 0x477688 */
+            g_exitRaceFlag = 1;                              /* 0x47768e */
+            g_raceResult = RACE_RESULT_RESTART;               /* binary: aliased via 0x901C10 = selection */
+        }
+        else if (pauseResult == 3) {                         /* 0x477696: quit (selection=2) */
+            g_fadeSpeed = 0x10;                              /* 0x4776aa */
+            g_exitRaceFlag = 1;                              /* 0x4776b0 */
+            g_fadeState = FADE_OUT;                          /* 0x4776b6: EDX=2 */
+            g_raceResult = RACE_RESULT_QUIT;                 /* binary: aliased via 0x901C10 = selection */
+            if (online) {
+                g_isPaused = 0;                              /* our pause ends for the others */
+                CloseDirectPlaySession();                    /* LEAVE / HOST_LEFT now */
+#ifdef SONICR_MATCHMAKER
+                {   /* host: take the session off the online list */
+                    extern void MatchmakerClearSession(void);
+                    MatchmakerClearSession();
+                }
+#endif
+            }
+        }
+    }
+
+}
+
 /**
  * UpdatePerPlayerInput - 0x0047754C - 1750 bytes
  *
@@ -354,41 +415,7 @@ void UpdatePerPlayerInput(void)
                             | g_joySlotState[2] | g_joySlotState[3]
                             | g_joySlotState[4];
 
-    /* Pause handling */
-    if ((g_combinedInputState & 0x800) != 0 && g_isPaused == 0 &&
-        g_pauseLatch == 0 && g_fadeState == FADE_VISIBLE &&
-        g_introCountdown == 0 && g_demoMode == DEMO_NONE && g_postRaceCameraMode == 0 &&
-        !NetRaceFrozen())   /* someone else paused us, or the resume countdown */
-    {
-        PlaySoundEffect(0, 0, 0);
-        StopAmbientSounds();
-        g_isPaused = 1;
-        g_pauseLatch = 1;
-    }
-
-    if ((g_combinedInputState & 0x800) == 0 && g_isPaused == 0 && g_pauseLatch == 1) {
-        g_pauseLatch = 0;
-    }
-
-    if (g_isPaused != 0) {
-        int pauseResult = RunPauseMenu();
-        if (pauseResult == 1) {
-            g_isPaused = 0;
-            g_pauseLatch = 1;
-        }
-        else if (pauseResult == 2) {                         /* 0x477674: options/restart (selection=1) */
-            g_fadeState = FADE_OUT;                          /* 0x477683: EAX=2 */
-            g_fadeSpeed = 0x10;                              /* 0x477688 */
-            g_exitRaceFlag = 1;                              /* 0x47768e */
-            g_raceResult = RACE_RESULT_RESTART;               /* binary: aliased via 0x901C10 = selection */
-        }
-        else if (pauseResult == 3) {                         /* 0x477696: quit (selection=2) */
-            g_fadeSpeed = 0x10;                              /* 0x4776aa */
-            g_exitRaceFlag = 1;                              /* 0x4776b0 */
-            g_fadeState = FADE_OUT;                          /* 0x4776b6: EDX=2 */
-            g_raceResult = RACE_RESULT_QUIT;                 /* binary: aliased via 0x901C10 = selection */
-        }
-    }
+    HandlePauseInput();
 
     /* Input assignment (normal gameplay) */
     if (g_demoMode == DEMO_NONE) {

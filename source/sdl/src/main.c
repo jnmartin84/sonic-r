@@ -1556,6 +1556,11 @@ race_start:
             RACE_MARK("UpdatePerPlayerInput");
             UpdatePerPlayerInput();
         }
+        else {
+            /* Online: inputs come from the network, but Start still pauses. */
+            extern void HandlePauseInput(void);
+            HandlePauseInput();
+        }
         /* [0x4CC9B4]: debug track/variant-select cheat — deliberately not
          * ported (debug keys unwired; the intro-countdown reset it was mistranslated as
          * is done for real in race_timing.c @ 0x4CB8C5). */
