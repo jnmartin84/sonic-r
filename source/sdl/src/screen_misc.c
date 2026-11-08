@@ -459,6 +459,7 @@ static const int s_optPageItems[7][2] = {
  * Computes item count, scroll range, and centering offset.
  * ===================================================================== */
 static int IsDisabledGraphicsItem(int itemIndex);
+static void DrawPixText(const char *s, int x, int y, int pixSz, uint32_t color);
 
 void InitOptionsMenuPage(int pageIndex, int basePos)  /* EAX, EDX */
 {
@@ -642,7 +643,9 @@ static void OptionsMenuScrollDown(void)
 static int IsDisabledGraphicsItem(int itemIndex)
 {
     switch (itemIndex) {
-        case 23:
+#ifndef SONICR_XBOX
+        case 23:   /* on the Xbox this row picks the video mode */
+#endif
         case 24:
         case 25:
         case 27:
@@ -721,6 +724,23 @@ static void DrawOptionItem(int xPos, int itemIndex)
     int uvBaseY = 0;      /* UV Y for value icon */
     int valueTpage = 1;   /* default tpage offset for value icons */
 
+#ifdef SONICR_XBOX
+    if (itemIndex == 23) {
+        /* Resolution row: the video mode, drawn as text. */
+        extern int g_xbVideoMode, g_xbRunningMode, g_xb720Allowed;
+        static const char *names[3] = { "480P", "720P", "720P FULL" };
+        int mode = g_xbVideoMode >= 0 ? g_xbVideoMode : g_xbRunningMode;
+        int y = xPos * 2;
+        DrawPixText(names[mode], 0x148, y + 6, 3, 0xFFFFFFFF);
+        if (mode >= 1 && !g_xb720Allowed) {
+            DrawPixText("ENABLE 720P IN THE DASHBOARD", 0xD0, y + 38, 2, 0xFFC0C0C0);
+        }
+        else if (mode != g_xbRunningMode) {
+            DrawPixText("RESTART THE GAME TO APPLY", 0xD0, y + 38, 2, 0xFFC0C0C0);
+        }
+        return;
+    }
+#endif
     if (itemIndex >= 8 && itemIndex <= 31) {
         int idx = itemIndex - 8;
 #ifdef SONICR_XBOX
@@ -1570,6 +1590,23 @@ int OptionsMenuScreen(void)
                         }
                         /* case 14: item 22 — no left/right handler */
                         /* case 15: item 23 — display resolution change (stub for SDL) */
+#ifdef SONICR_XBOX
+                        case 15: { /* item 23: Xbox video mode 480p / 720p / 720p full */
+                            extern int g_xbVideoMode, g_xbRunningMode;
+                            extern void SaveGameSettings(void);
+                            int cur = g_xbVideoMode >= 0 ? g_xbVideoMode : g_xbRunningMode;
+                            int v = cur + direction;
+                            if (v < 0) v = 0;
+                            if (v > 2) v = 2;
+                            if (v != cur) {
+                                g_xbVideoMode = v;
+                                SaveGameSettings();
+                                PlaySoundEffect(1, 0, 0);
+                            }
+                            lastTime = timeGetTime() / 1000;
+                            break;
+                        }
+#endif
                         /* case 16: item 24 — color depth change (stub for SDL) */
                         case 17: /* item 25: interlace — software-only, no-op in D3D */
                             break;

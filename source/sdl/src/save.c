@@ -357,6 +357,10 @@ void SavePadTypesImpl(void)
 /* Last Load/Save slot the player used, -1 if none: the progress is loaded
  * from it at start-up and written back to it after every race. */
 int g_lastSaveSlot = -1;
+/* Xbox video mode: 0 = 480p, 1 = 720p (4:3 with side bars), 2 = 720p full
+ * screen (stretched); -1 = not chosen (D:\VIDEO.TXT or 480p). Read before
+ * the video mode is set; a change applies on the next start. */
+int g_xbVideoMode = -1;
 
 int LoadGameSettings(void)
 {
@@ -409,6 +413,8 @@ int LoadGameSettings(void)
         /* Port addition: last save slot used (slot + 1, 0 = none) in the
          * spare tail of the block; old files have 0 there. */
         g_lastSaveSlot = (buf[32] >= 1 && buf[32] <= 10) ? buf[32] - 1 : -1;
+        /* Xbox video mode chosen in Options > Graphics (mode + 1, 0 = unset). */
+        g_xbVideoMode = (buf[33] >= 1 && buf[33] <= 3) ? buf[33] - 1 : -1;
     }
     return 1;
 }
@@ -454,6 +460,7 @@ void SaveGameSettings(void)
         buf[24 + i] = g_optCfgRomData[i];
     }
     buf[32] = (g_lastSaveSlot >= 0) ? g_lastSaveSlot + 1 : 0;
+    buf[33] = (g_xbVideoMode >= 0) ? g_xbVideoMode + 1 : 0;
 
     bswap32_arr(buf, 40);
     FILE *fp = fOpen("SONICR.INF", "wb");

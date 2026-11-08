@@ -436,6 +436,8 @@ static unsigned char SDLScancodeToDIK(SDL_Scancode sc)
 
 #ifdef SONICR_XBOX
 int g_xbStretch;   /* 720p: stretch the 4:3 image to the full 16:9 frame */
+int g_xbRunningMode;   /* video mode in use: 0 480p, 1 720p, 2 720p stretched */
+int g_xb720Allowed;    /* dashboard has 720p enabled */
 #endif
 
 int platform_init(int width, int height, int fullscreen, const char *title)
@@ -458,13 +460,21 @@ int platform_init(int width, int height, int fullscreen, const char *title)
          * (both only if the dashboard has 720p enabled). */
         DWORD enc = XVideoGetEncoderSettings();
         int want720 = 0;
-        FILE *cfg = fopen("D:\\VIDEO.TXT", "r");
-        if (cfg) {
-            int c = fgetc(cfg);
-            if (c == '7') want720 = 1;
-            if (c == 'W' || c == 'w') { want720 = 1; g_xbStretch = 1; }
-            fclose(cfg);
+        extern int g_xbVideoMode;   /* Options > Graphics > Resolution (save.c) */
+        if (g_xbVideoMode >= 0) {
+            want720 = (g_xbVideoMode >= 1);
+            g_xbStretch = (g_xbVideoMode == 2);
         }
+        else {
+            FILE *cfg = fopen("D:\\VIDEO.TXT", "r");
+            if (cfg) {
+                int c = fgetc(cfg);
+                if (c == '7') want720 = 1;
+                if (c == 'W' || c == 'w') { want720 = 1; g_xbStretch = 1; }
+                fclose(cfg);
+            }
+        }
+        g_xb720Allowed = (enc & VIDEO_MODE_720P) != 0;
         fprintf(stderr, "video: dashboard settings 0x%08lx (720p %s, 480p %s, widescreen %s)\n",
                 (unsigned long)enc, (enc & VIDEO_MODE_720P) ? "on" : "off",
                 (enc & VIDEO_MODE_480P) ? "on" : "off", (enc & VIDEO_WIDESCREEN) ? "on" : "off");
@@ -481,6 +491,7 @@ int platform_init(int width, int height, int fullscreen, const char *title)
         s_fbWidth = width;
         s_fbHeight = height;
         if (width != 1280) g_xbStretch = 0;
+        g_xbRunningMode = (width == 1280) ? (g_xbStretch ? 2 : 1) : 0;
         fprintf(stderr, "video: running at %dx%d%s\n", width, height, g_xbStretch ? " (stretched to 16:9)" : "");
     }
     if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
