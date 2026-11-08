@@ -463,7 +463,7 @@ static void FUN_0045ca28(int vpIdx)
     /* Screen scale — adjusts ripple amplitude for viewport size (0x45ca9b-cc7) */
     float screenScale;
     if (g_numHumans == 2 && g_viewportIndex == 1) {                           /* 0x45caa4 */
-        screenScale = (float)((sr_double)g_dispHalfWidth * (1.0 / 480.0));    /* 0x52C438 */
+        screenScale = (float)((sr_double)g_dispHalfHeight * (1.0 / 480.0));  /* 0x45caad fild [0x6e9884] */    /* 0x52C438 */
     }
     else {
         screenScale = (float)((sr_double)g_screenWidthFull * (1.0 / 640.0));  /* 0x52C430 */
@@ -803,7 +803,7 @@ static void RenderWaterBandSWRipple(int vpIdx)
      * are 640x480-reference pixels and scale with the framebuffer. */
     float screenScale;
     if (g_numHumans == 2 && g_viewportIndex == 1) {
-        screenScale = (float)((sr_double)g_dispHalfWidth * (1.0 / 480.0));
+        screenScale = (float)((sr_double)g_dispHalfHeight * (1.0 / 480.0));  /* 0x45caad fild [0x6e9884] */
     }
     else {
         screenScale = (float)((sr_double)g_screenWidthFull * (1.0 / 640.0));

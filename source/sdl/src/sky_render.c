@@ -158,10 +158,10 @@ void ComputeParallaxAndPlayfieldState(int vpIdx, int *cam)
         case TRACK_RADICAL_CITY:
             trackMult = parallaxW * 0x46;
             break;
-        case TRACK_REGAL_RUIN:
+        case TRACK_REGAL_RUIN:              /* 0x497a7b: binary id 4 (ruin) -> 111*W */
             trackMult = parallaxW * 0x6F;
             break;
-        case TRACK_REACTIVE_FACTORY:
+        case TRACK_REACTIVE_FACTORY:        /* 0x497a98: binary id 3 (factory) -> 102*W */
             trackMult = parallaxW * 0x66;
             break;
         case TRACK_RADIANT_EMERALD:
