@@ -601,6 +601,27 @@ void BeginFrame(void)
     float top    = dvClipY;                    /* Y=0 maps to dvClipY (top) */
     float bottom = dvClipY - dvClipHeight;     /* Y=H maps to dvClipY - dvClipHeight */
 
+#ifdef SONICR_XBOX
+    /* pbgl clamps the scissor/window clip to [0, viewport width) instead of
+     * [viewport x, x + width), so with a pillarboxed viewport (720p: x=160,
+     * w=960) everything right of pixel 960 was cut off. Keep the GL viewport
+     * at the full framebuffer and do the pillar/letterbox in the projection:
+     * widen the ortho range so the game's clip volume lands on the 4:3 rect. */
+    if (offsetX != 0 || offsetY != 0 || vpW != fullW || vpH != fullH) {
+        glViewport(0, 0, fullW, fullH);
+        float n0x = -1.0f + 2.0f * (float)offsetX / (float)fullW;
+        float n1x = -1.0f + 2.0f * (float)(offsetX + vpW) / (float)fullW;
+        float n0y = -1.0f + 2.0f * (float)offsetY / (float)fullH;          /* GL y: bottom */
+        float n1y = -1.0f + 2.0f * (float)(offsetY + vpH) / (float)fullH;
+        /* ortho maps [l, r] -> [-1, 1]; we want left -> n0x, right -> n1x */
+        float sx = (n1x - n0x) / (right - left), bx = n0x - sx * left;
+        float sy = (n1y - n0y) / (top - bottom), by = n0y - sy * bottom;
+        left   = (-1.0f - bx) / sx;
+        right  = ( 1.0f - bx) / sx;
+        bottom = (-1.0f - by) / sy;
+        top    = ( 1.0f - by) / sy;
+    }
+#endif
 #ifndef SONICR_GLES2
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();

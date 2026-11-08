@@ -152,8 +152,7 @@ The game renders at 640x480 (4:3) game coordinates. By default the Xbox build
 runs at **640x480**: 480p if the dashboard has 480p enabled (HD AV pack /
 component cable), 480i if not.
 
-720p is opt-in while it is being verified (on the first 720p test the menus and
-intros came out cropped): create a text file `VIDEO.TXT` next to `default.xbe`
+720p is opt-in while it is being verified: create a text file `VIDEO.TXT` next to `default.xbe`
 whose first character is
 
 - `7` - 1280x720 with the 4:3 image pillarboxed (black side bars), or
@@ -161,6 +160,12 @@ whose first character is
 
 Both need 720p enabled in the dashboard; otherwise the game stays at 640x480.
 `SONICR.LOG` prints the dashboard flags and the mode in use ("video: ...").
+
+(The first 720p test came out cropped on the right: pbgl clamps its window clip
+to `[0, viewport width)` rather than `[viewport x, x + width)`, so a pillarboxed
+viewport starting at x=160 lost its last 160 pixels. The Xbox build now keeps
+the GL viewport at the full framebuffer and places the 4:3 image through the
+projection instead.)
 
 ## Known limitations
 
