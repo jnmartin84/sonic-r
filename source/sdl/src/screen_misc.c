@@ -434,7 +434,7 @@ static const int s_optPageItems[7][2] = {
     {  8, 15 },   /* 1: Game */
     { 16, 22 },   /* 2: Sound */
 #ifdef SONICR_XBOX
-    { 29, 30 },   /* 3: Graphics — Draw Distance (item 29 here) + Back */
+    { 28, 30 },   /* 3: Graphics — Resolution (shown as item 28), Draw Distance (item 29), Back */
 #else
 #ifdef SONICR_XBOX
     { 29, 30 },   /* 3: Graphics — Draw Distance (shown as item 29) + Back */
@@ -643,13 +643,13 @@ static void OptionsMenuScrollDown(void)
 static int IsDisabledGraphicsItem(int itemIndex)
 {
     switch (itemIndex) {
-#ifndef SONICR_XBOX
-        case 23:   /* on the Xbox this row picks the video mode */
-#endif
+        case 23:
         case 24:
         case 25:
         case 27:
-        case 28:
+#ifndef SONICR_XBOX
+        case 28:   /* on the Xbox this row is Resolution (video mode) */
+#endif
 #ifdef SONICR_XBOX
         case 26:   /* Draw Distance lives in slot 29 on this build */
 #else
@@ -686,6 +686,11 @@ static void DrawOptionItem(int xPos, int itemIndex)
 #endif
 
     const int *info = s_optItemInfo[itemIndex]; /* 5 ints: tpage, srcX, srcY, width, hasValue */
+#ifdef SONICR_XBOX
+    if (itemIndex == 28) {
+        info = s_optItemInfo[23];   /* "Resolution" label (row 28 is the video mode here) */
+    }
+#endif
     int tpageOff = info[0];
     int srcX = info[1];
     int srcY = info[2];
@@ -725,7 +730,7 @@ static void DrawOptionItem(int xPos, int itemIndex)
     int valueTpage = 1;   /* default tpage offset for value icons */
 
 #ifdef SONICR_XBOX
-    if (itemIndex == 23) {
+    if (itemIndex == 28) {
         /* Resolution row: the video mode, drawn as text. */
         extern int g_xbVideoMode, g_xbRunningMode, g_xb720Allowed;
         static const char *names[3] = { "480P", "720P", "720P FULL" };
@@ -1403,6 +1408,9 @@ int OptionsMenuScreen(void)
 #ifdef SONICR_XBOX
                 else if (item == 29) {
                     item = 26;   /* slot 29 carries Draw Distance */
+                }
+                else if (item == 28) {
+                    item = 23;   /* slot 28 carries Resolution (video mode) */
                 }
 #endif
 
