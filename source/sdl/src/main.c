@@ -308,6 +308,33 @@ static int JoinHostIp(const char *hostIp)
     return 1;
 }
 
+/* Online races: players on different machines never collided, because the
+ * pairwise SweepPlayerCollision calls only run when both players are simulated
+ * here. Each machine now collides its own players against the remote ones and
+ * keeps only the effect on its own player (the remote one is restored; its
+ * owner does the mirror-image check on its side), so both get pushed apart as
+ * in offline play. The remote player is treated as standing still for the
+ * swept test, since its previous-frame position is not tracked here. */
+void NetLocalRemoteCollision(void)
+{
+    static Player s_saved;
+    for (int i = 0; i < (int)g_numPlayers; i++) {
+        if (!net_should_run_physics(i)) continue;
+        for (int j = 0; j < (int)g_numPlayers; j++) {
+            if (j == i || net_should_run_physics(j)) continue;
+            Player *r = &g_playerBase[j];
+            if (!r->netActive) continue;
+            memcpy(&s_saved, r, sizeof(Player));
+            r->prevPosX = r->posX;
+            r->prevPosY = r->posY;
+            r->prevPosZ = r->posZ;
+            if (r->speedCategory == 0) r->speedCategory = g_playerBase[i].speedCategory;
+            SweepPlayerCollision(&g_playerBase[i], r);
+            memcpy(r, &s_saved, sizeof(Player));
+        }
+    }
+}
+
 int JoinNetworkSession(const char *name, int enumIdx)
 {
     (void)name; (void)enumIdx;
@@ -1684,6 +1711,9 @@ race_start:
                         if (net_should_run_physics(2) && net_should_run_physics(3)) {
                             SweepPlayerCollision(PLAYER_PTR(2), PLAYER_PTR(3));
                         }
+                    }
+                    if (net_is_active()) {
+                        NetLocalRemoteCollision();
                     }
                 }
                 else if (g_raceType == RACE_TIMEATTACK && g_raceSubMode < SUBMODE_TAG && g_ghostDataExists != 0) {
