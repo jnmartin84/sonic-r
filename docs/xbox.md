@@ -82,8 +82,10 @@ folder is writable). If it fails to start, send that file.
 
 ### Saves
 
-Saves go to the hard drive in `E:\UDATA\FFFF5352` (the title ID is patched
-into the XBE after the build with `source/xbox/tools/set_titleid.py`).
+Saves go to the hard drive in `E:\UDATA\FFFF5352`. cxbe always writes the
+generic title ID FFFF0002, so the default `make` goal stamps FFFF5352 into the
+XBE with `source/xbox/tools/set_titleid.py`. Without it the game would look
+for its saves in another folder.
 
 ## Xbox-specific features
 
