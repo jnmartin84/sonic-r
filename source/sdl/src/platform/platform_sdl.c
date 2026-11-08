@@ -434,6 +434,10 @@ static unsigned char SDLScancodeToDIK(SDL_Scancode sc)
  * Platform API implementation
  * ===================================================================== */
 
+#ifdef SONICR_XBOX
+int g_xbStretch;   /* 720p: stretch the 4:3 image to the full 16:9 frame */
+#endif
+
 int platform_init(int width, int height, int fullscreen, const char *title)
 {
     s_fbWidth = width;
@@ -447,17 +451,18 @@ int platform_init(int width, int height, int fullscreen, const char *title)
     (void)fullscreen;
     (void)title;
     {
-        /* Follow the dashboard: if 720p is enabled there (component/HD cable
-         * with the 720p box ticked), run at 1280x720 - the 4:3 image is
-         * pillarboxed and the renderer scales to it. D:\VIDEO.TXT can
-         * override: '4' forces 640x480, '7' asks for 720p. */
+        /* Default 640x480 (480p/480i per the dashboard). 720p is opt-in until
+         * it is verified on more TVs: D:\VIDEO.TXT starting with
+         *   '7' -> 1280x720, 4:3 image pillarboxed (black side bars)
+         *   'W' -> 1280x720, image stretched to fill the 16:9 screen
+         * (both only if the dashboard has 720p enabled). */
         DWORD enc = XVideoGetEncoderSettings();
-        int want720 = (enc & VIDEO_MODE_720P) ? 1 : 0;
+        int want720 = 0;
         FILE *cfg = fopen("D:\\VIDEO.TXT", "r");
         if (cfg) {
             int c = fgetc(cfg);
             if (c == '7') want720 = 1;
-            if (c == '4') want720 = 0;
+            if (c == 'W' || c == 'w') { want720 = 1; g_xbStretch = 1; }
             fclose(cfg);
         }
         fprintf(stderr, "video: dashboard settings 0x%08lx (720p %s, 480p %s, widescreen %s)\n",
@@ -475,7 +480,8 @@ int platform_init(int width, int height, int fullscreen, const char *title)
         }
         s_fbWidth = width;
         s_fbHeight = height;
-        fprintf(stderr, "video: running at %dx%d\n", width, height);
+        if (width != 1280) g_xbStretch = 0;
+        fprintf(stderr, "video: running at %dx%d%s\n", width, height, g_xbStretch ? " (stretched to 16:9)" : "");
     }
     if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());

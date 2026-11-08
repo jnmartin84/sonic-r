@@ -148,16 +148,18 @@ Xbox has no OS random source.
 
 ## Video mode
 
-The game renders at 640x480 (4:3) game coordinates and follows the dashboard's
-video settings:
+The game renders at 640x480 (4:3) game coordinates. By default the Xbox build
+runs at **640x480**: 480p if the dashboard has 480p enabled (HD AV pack /
+component cable), 480i if not.
 
-- **720p** if 720p is enabled in the dashboard (HD AV pack / component cable):
-  the framebuffer is 1280x720 and the 4:3 image is pillarboxed in the middle
-  (960x720), scaled up by the GPU.
-- Otherwise **640x480**: 480p if the dashboard has 480p enabled, 480i if not.
+720p is opt-in while it is being verified (on the first 720p test the menus and
+intros came out cropped): create a text file `VIDEO.TXT` next to `default.xbe`
+whose first character is
 
-A text file `VIDEO.TXT` next to `default.xbe` can override this: first
-character `4` forces 640x480 (e.g. if memory gets tight), `7` asks for 720p.
+- `7` - 1280x720 with the 4:3 image pillarboxed (black side bars), or
+- `W` - 1280x720 with the image stretched to fill the 16:9 screen.
+
+Both need 720p enabled in the dashboard; otherwise the game stays at 640x480.
 `SONICR.LOG` prints the dashboard flags and the mode in use ("video: ...").
 
 ## Known limitations

@@ -562,6 +562,17 @@ void BeginFrame(void)
     }
     int offsetX = (fullW - vpW) / 2;
     int offsetY = (fullH - vpH) / 2;
+#ifdef SONICR_XBOX
+    {
+        extern int g_xbStretch;
+        if (g_xbStretch) {   /* VIDEO.TXT 'W': fill the 16:9 frame */
+            vpW = fullW;
+            vpH = fullH;
+            offsetX = 0;
+            offsetY = 0;
+        }
+    }
+#endif
 
     g_glViewportOffsetX = offsetX;
     g_glViewportOffsetY = offsetY;
