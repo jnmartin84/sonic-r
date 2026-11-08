@@ -155,6 +155,9 @@ void DrawPauseOverlay(void)
         return;
     }
 
+    /* Online pause messages / resume countdown (net/network.c). */
+    { extern void NetPauseDraw(void); NetPauseDraw(); }
+
     /* Pause menu overlay */
     if (g_isPaused == 0)
         return;                                                 /* 0x4d1453 */

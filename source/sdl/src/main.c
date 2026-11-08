@@ -315,6 +315,11 @@ static int JoinHostIp(const char *hostIp)
  * owner does the mirror-image check on its side), so both get pushed apart as
  * in offline play. The remote player is treated as standing still for the
  * swept test, since its previous-frame position is not tracked here. */
+void NetPauseTick(void);
+int  NetRaceFrozen(void);
+void NetPauseReset(void);
+extern int g_netPauseTimedOut;
+
 void NetLocalRemoteCollision(void)
 {
     static Player s_saved;
@@ -1377,6 +1382,7 @@ race_setup:
     SelectCDTrack();
     g_netFrameCounter = 0;
     g_netDisconnectFlag = 0;
+    NetPauseReset();
     g_netSyncEstablished = 0;
     g_netPlayerAlive[0] = 0;
     g_netPlayerAlive[1] = 0;
@@ -1544,6 +1550,14 @@ race_start:
          * ported (debug keys unwired; the intro-countdown reset it was mistranslated as
          * is done for real in race_timing.c @ 0x4CB8C5). */
         if (g_netDisconnectFlag != 0 && g_fadeLevel == -256) {
+            if (g_netPauseTimedOut) {
+                /* Paused too long (NetPauseTick): leave the session so both
+                 * sides land on the host/join screen. */
+                g_netPauseTimedOut = 0;
+                CloseDirectPlaySession();
+                g_netLastRole = 0;
+            }
+            NetPauseReset();
             RACE_MARK("StopCD");
             StopCD();
             RACE_MARK("StopAmbientSounds");
@@ -1598,7 +1612,10 @@ race_start:
         }
 
         g_polyCount = 0;
-        if (g_isPaused == 0) {
+        if (net_is_active() && (g_isNetworkGame || g_netSessionActive)) {
+            NetPauseTick();
+        }
+        if (g_isPaused == 0 && !NetRaceFrozen()) {
             if (g_introTimer == 0x1e && g_demoMode == DEMO_REPLAY) {
                 /* 0x4cf0b8: mov eax,0x38 — replay commentary. The clip is
                  * split across consecutive slots from 0x38, so starting it

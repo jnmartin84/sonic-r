@@ -142,6 +142,10 @@ UDP directly between the consoles/PCs, with UPnP to open the host's port.
   its join request every second and, after 3 s, looks for the host on the local
   network (routers often can't reach their own public address from inside), so
   two machines in the same house can join each other from the online list.
+  Pausing an online race pauses it for everyone ("GAME PAUSED BY <name>");
+  on resume all players get a 3-2-1 countdown, and a race left paused for
+  120 s ends and everyone returns to the host/join screen. Players on
+  different machines collide with each other like offline opponents.
   There is no typed lobby chat
   (no keyboard). The host needs at least
   one other player to start a race.

@@ -280,6 +280,7 @@ static int s_haveSlotAssign = 0;
 int NetClientHasSlot(void) { return s_haveSlotAssign; }
 
 static DWORD s_lastHostPacketMs = 0;
+void NetPauseRemote(int slot, int state);
 
 /* Host: per-slot timestamp of last received packet. Used by the host-side
  * stale watchdog to free slots that have gone silent (e.g. crashed clients,
@@ -1475,6 +1476,19 @@ void ApplyNetworkPlayerState(void)
         /* Polite client goodbye — free the slot immediately rather than
          * waiting for the stale-slot watchdog. Handled before the unregistered
          * -slot fatal check so a stray LEAVE doesn't trip it. */
+        /* Online pause (see NetPauseTick). */
+        if (header == NET_MSG_PAUSE && len >= 12) {
+            int slot  = rl32s(buf + 4);
+            int state = rl32s(buf + 8);
+            if (net_is_host()) {
+                net_broadcast(buf, len);          /* relay to the other clients */
+            }
+            if (slot >= 0 && slot < NET_MAX_PLAYERS && slot != g_localPlayerIndex) {
+                NetPauseRemote(slot, state);
+            }
+            continue;
+        }
+
         if (net_is_host() && header == NET_MSG_LEAVE) {
             if (from_slot >= 1 && from_slot < NET_MAX_PLAYERS) {
                 DebugLog("Host: slot %d sent LEAVE\n", from_slot);
@@ -2133,4 +2147,190 @@ int BuildNetworkPhoneNumber(void)
 done:
     g_phoneNumberBuf[outIdx] = 0;
     return outIdx;
+}
+
+
+/* =====================================================================
+ * Online pause
+ *
+ * Pausing used to be purely local: the paused machine stopped simulating and
+ * sending, and after 5 s the others dropped it as disconnected. Now:
+ *  - the player who pauses broadcasts NET_MSG_PAUSE(1) twice a second; the
+ *    other machines freeze the race and show "GAME PAUSED BY <name>";
+ *  - on resume NET_MSG_PAUSE(0) is sent and every machine runs a 3-2-1
+ *    countdown before the race continues;
+ *  - if the race stays paused for 120 s, everyone leaves the online race and
+ *    goes back to the host/join screen.
+ * ===================================================================== */
+#define NET_PAUSE_TIMEOUT_MS   120000u
+#define NET_PAUSE_COUNTDOWN_MS 3000u
+
+static int   s_npRemoteSlot = -1;     /* slot that paused us, -1 none */
+static int   s_npLocalPaused;         /* our own pause is being broadcast */
+static DWORD s_npStartMs;             /* when the current pause began */
+static DWORD s_npRemoteLastMs;        /* last PAUSE(1) heard from the pauser */
+static DWORD s_npLastSendMs;
+static DWORD s_npCountdownEndMs;      /* 0 = no countdown */
+static int   s_npResumeSends;         /* extra resume packets still to send */
+int g_netPauseTimedOut;
+
+static void np_send(int state)
+{
+    char b[12];
+    wl32(b + 0, (uint32_t)NET_MSG_PAUSE);
+    wl32(b + 4, (uint32_t)g_localPlayerIndex);
+    wl32(b + 8, (uint32_t)state);
+    if (net_is_host()) {
+        net_broadcast(b, 12);
+    }
+    else if (s_haveSlotAssign) {
+        net_send_to_host(b, 12);
+    }
+    s_npLastSendMs = timeGetTime();
+}
+
+static void np_reset_silence(void)
+{
+    DWORD now = timeGetTime();
+    for (int i = 0; i < NET_MAX_PLAYERS; i++) {
+        if (s_hostSlotLastRecvMs[i] != 0) s_hostSlotLastRecvMs[i] = now;
+    }
+    if (s_lastHostPacketMs != 0) s_lastHostPacketMs = now;
+}
+
+static void np_start_countdown(void)
+{
+    s_npCountdownEndMs = timeGetTime() + NET_PAUSE_COUNTDOWN_MS;
+    if (s_npCountdownEndMs == 0) s_npCountdownEndMs = 1;
+}
+
+void NetPauseRemote(int slot, int state)
+{
+    if (state) {
+        s_npRemoteLastMs = timeGetTime();
+        if (s_npRemoteSlot < 0) {
+            s_npRemoteSlot = slot;
+            s_npStartMs = timeGetTime();
+            s_npCountdownEndMs = 0;
+            DebugLog("Net: race paused by slot %d ('%s')\n", slot, net_get_slot_name(slot));
+        }
+    }
+    else if (s_npRemoteSlot == slot) {
+        s_npRemoteSlot = -1;
+        np_start_countdown();
+        DebugLog("Net: slot %d resumed, countdown\n", slot);
+    }
+}
+
+/* Race frozen by the network (someone else paused, or the resume countdown). */
+int NetRaceFrozen(void)
+{
+    return s_npRemoteSlot >= 0 || s_npCountdownEndMs != 0;
+}
+
+void NetPauseReset(void)
+{
+    s_npRemoteSlot = -1;
+    s_npLocalPaused = 0;
+    s_npCountdownEndMs = 0;
+    s_npResumeSends = 0;
+}
+
+/* Called once per race frame in network races, before the simulation. */
+void NetPauseTick(void)
+{
+    if (!net_is_active()) {
+        NetPauseReset();
+        return;
+    }
+    DWORD now = timeGetTime();
+
+    /* Our pause started / ended. */
+    if (g_isPaused && !s_npLocalPaused) {
+        s_npLocalPaused = 1;
+        s_npStartMs = now;
+        np_send(1);
+        DebugLog("Net: we paused the race\n");
+    }
+    else if (!g_isPaused && s_npLocalPaused) {
+        s_npLocalPaused = 0;
+        np_send(0);
+        s_npResumeSends = 3;
+        np_start_countdown();
+        DebugLog("Net: we resumed, countdown\n");
+    }
+    else if (s_npLocalPaused && now - s_npLastSendMs >= 500) {
+        np_send(1);                                  /* keep the others frozen */
+    }
+    else if (s_npResumeSends > 0 && now - s_npLastSendMs >= 200) {
+        np_send(0);                                  /* resume is UDP too */
+        s_npResumeSends--;
+    }
+
+    /* While anything is paused the race loop does not poll the network, so
+     * drain it here (pause/resume messages, and so the queue doesn't pile up). */
+    if (g_isPaused || NetRaceFrozen()) {
+        ApplyNetworkPlayerState();
+        /* The pauser went quiet (quit, crashed, cable pulled): stop waiting
+         * for it and let the normal disconnect handling take over. */
+        if (s_npRemoteSlot >= 0 && timeGetTime() - s_npRemoteLastMs > 6000) {
+            DebugLog("Net: pauser slot %d went silent - unfreezing\n", s_npRemoteSlot);
+            s_npRemoteSlot = -1;
+        }
+        else {
+            np_reset_silence();                      /* nobody is "silent" now */
+        }
+    }
+
+    if (s_npCountdownEndMs != 0 && (int)(now - s_npCountdownEndMs) >= 0) {
+        s_npCountdownEndMs = 0;
+        np_reset_silence();
+    }
+
+    /* Paused for too long: end the online race for everyone. */
+    if ((s_npLocalPaused || s_npRemoteSlot >= 0) && g_netDisconnectFlag == 0
+        && now - s_npStartMs >= NET_PAUSE_TIMEOUT_MS) {
+        DebugLog("Net: paused for %us - closing the online race\n",
+                 (unsigned)(NET_PAUSE_TIMEOUT_MS / 1000));
+        g_netPauseTimedOut = 1;
+        g_netDisconnectFlag = 1;
+        g_isPaused = 0;
+        s_npLocalPaused = 0;
+        g_fadeState = FADE_OUT;
+        g_fadeSpeed = 0xC;
+    }
+}
+
+/* Text overlay (called from DrawPauseOverlay). */
+void NetPauseDraw(void)
+{
+    extern void DrawDebugOverlayText(const char *s, int x, int y, int pixSz, uint32_t color);
+    char line[64];
+    if (!net_is_active()) return;
+    DWORD now = timeGetTime();
+    unsigned left = 0;
+    if (s_npLocalPaused || s_npRemoteSlot >= 0) {
+        DWORD el = now - s_npStartMs;
+        left = el >= NET_PAUSE_TIMEOUT_MS ? 0 : (NET_PAUSE_TIMEOUT_MS - el + 999) / 1000;
+    }
+    if (s_npRemoteSlot >= 0 && !g_isPaused) {
+        char name[MM_MAX_USERNAME];
+        snprintf(name, sizeof(name), "%s", net_get_slot_name(s_npRemoteSlot));
+        for (char *c = name; *c; c++) if (*c >= 'a' && *c <= 'z') *c -= 32;
+        snprintf(line, sizeof(line), "GAME PAUSED BY %s", name[0] ? name : "A PLAYER");
+        DrawDebugOverlayText(line, (640 - (int)strlen(line) * 18) / 2, 200, 3, 0xFFFFFFFF);
+        snprintf(line, sizeof(line), "ONLINE RACE ENDS IN %u S", left);
+        DrawDebugOverlayText(line, (640 - (int)strlen(line) * 12) / 2, 240, 2, 0xC0C0C0C0);
+    }
+    else if (s_npLocalPaused && g_isPaused) {
+        snprintf(line, sizeof(line), "ONLINE RACE ENDS IN %u S", left);
+        DrawDebugOverlayText(line, (640 - (int)strlen(line) * 12) / 2, 340, 2, 0xFFFFFFFF);
+    }
+    else if (s_npCountdownEndMs != 0) {
+        int ms = (int)(s_npCountdownEndMs - now);
+        int n = ms <= 0 ? 1 : (ms + 999) / 1000;
+        snprintf(line, sizeof(line), "%d", n);
+        DrawDebugOverlayText(line, (640 - 8 * 6) / 2, 200, 8, 0xFFFFFFFF);
+        DrawDebugOverlayText("GET READY", (640 - 9 * 18) / 2, 280, 3, 0xFFFFFFFF);
+    }
 }

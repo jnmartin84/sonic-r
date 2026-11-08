@@ -14,6 +14,7 @@
 #include "platform.h"
 #include "endian_util.h"
 #include <stdio.h>
+int NetRaceFrozen(void);   /* net/network.c */
 
 /* Externs */
 
@@ -354,7 +355,8 @@ void UpdatePerPlayerInput(void)
     /* Pause handling */
     if ((g_combinedInputState & 0x800) != 0 && g_isPaused == 0 &&
         g_pauseLatch == 0 && g_fadeState == FADE_VISIBLE &&
-        g_introCountdown == 0 && g_demoMode == DEMO_NONE && g_postRaceCameraMode == 0)
+        g_introCountdown == 0 && g_demoMode == DEMO_NONE && g_postRaceCameraMode == 0 &&
+        !NetRaceFrozen())   /* someone else paused us, or the resume countdown */
     {
         PlaySoundEffect(0, 0, 0);
         StopAmbientSounds();
