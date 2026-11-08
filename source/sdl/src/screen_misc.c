@@ -25,9 +25,30 @@
  * the pad's Back button replaces ESC as "cancel". */
 #define XB_PAD_ITEM_OFS 0
 #define XB_CANCEL_PRESSED() ((g_diKeyboardState[0x01] != 0) || (g_keyPressState[4] & 0x80))
+/* Lobby chat needs a USB keyboard (xbox_kbd.c). With one, Enter sends and
+ * Backspace erases; the pad's A/B keep their lobby meaning. Typing must not
+ * leave the lobby either: 'A' is the keyboard Accel key, which feeds the same
+ * g_inputBits bit as the pad's back button, so with a keyboard attached the
+ * back check only looks at the pads (and Esc). */
+extern int xbox_kbd_present(void);
+#define CHAT_ENABLED()  xbox_kbd_present()
+#define CHAT_CONFIRM()  (g_diKeyboardState[0x1C] || g_diKeyboardState[0x9C])
+#define CHAT_ERASE()    (g_diKeyboardState[0x0E] != 0)
+static int xb_pad_back(void)
+{
+    for (int i = 0; i < 5; i++) {
+        if (g_joySlotState[i] & 0x0100) return 1;
+    }
+    return 0;
+}
+#define LOBBY_BACK()    (xbox_kbd_present() ? xb_pad_back() : ((g_inputBits & 1) != 0))
 #else
 #define XB_PAD_ITEM_OFS 3
 #define XB_CANCEL_PRESSED() (g_diKeyboardState[0x01] != 0)
+#define CHAT_ENABLED()  1
+#define CHAT_CONFIRM()  (g_inputBits & 0x02)
+#define CHAT_ERASE()    (g_inputBits & 0x01)
+#define LOBBY_BACK()    ((g_inputBits & 1) != 0)
 #endif
 
 void SoftwareRenderSortedPolygons(void);
@@ -5494,7 +5515,7 @@ int NetworkScreen(void)
          * original binary never wired ESC to the back action — added
          * here as an explicit g_diKeyboardState[DIK_ESCAPE] check so
          * the UI matches behaviour. */
-        if ((g_inputBits & 1) != 0 || g_diKeyboardState[0x01] != 0) {
+        if (LOBBY_BACK() || g_diKeyboardState[0x01] != 0) {
             if (firstFrame == 0) {
                 CloseDirectPlaySession();                      /* 0x4875CC */
                 PlaySoundEffect(0, 0, 0);
@@ -5803,14 +5824,14 @@ int NetworkScreen(void)
         if (ns_lobbyState < 2) {
             goto skip_text_entry;
         }
-#ifdef SONICR_XBOX
-        /* No keyboard: the lobby's typed-message line would only collect the
-         * pad's A presses as empty messages (rows of 'a' glyphs). */
-        goto skip_text_entry;
-#endif
+        /* No keyboard (Xbox without a USB keyboard): no typed-message line —
+         * it would only collect the pad's A presses as empty messages. */
+        if (!CHAT_ENABLED()) {
+            goto skip_text_entry;
+        }
 
         /* Confirm: submit selection */
-        if (g_inputBits & 0x02) {                               /* A/confirm — was RETURN(0x1C) at 0x6758E8 */
+        if (CHAT_CONFIRM()) {                                   /* A/confirm — was RETURN(0x1C) at 0x6758E8 */
             if (inputThrottle == 0) {                          /* 0x48B215 */
                 /* Store current entry in session buffer */
                 g_resultsTextBuffer[ns_slotQueueIdx] = -1;     /* 0x48B238 */
@@ -5838,7 +5859,7 @@ int NetworkScreen(void)
                 PlaySoundEffect(0x1A, 0, 0);
             }
         }
-        else if (g_inputBits & 0x01) {                       /* B/back — was BACKSPACE(0x0E) at 0x6758DA */
+        else if (CHAT_ERASE()) {                             /* B/back — was BACKSPACE(0x0E) at 0x6758DA */
             if (inputThrottle == 0) {
                 if (ns_slotQueueIdx > 0) {
                     ns_slotQueueIdx--;
@@ -6664,7 +6685,7 @@ int NetworkScreenReentry(void)
             goto render_frame_re;
         }
 
-        if ((g_inputBits & 1) != 0 || g_diKeyboardState[0x01] != 0) {
+        if (LOBBY_BACK() || g_diKeyboardState[0x01] != 0) {
             if (firstFrame == 0) {
                 CloseDirectPlaySession();
                 PlaySoundEffect(0, 0, 0);
@@ -6836,11 +6857,11 @@ int NetworkScreenReentry(void)
         if (ns_lobbyState < 2) {
             goto skip_text_entry_re;
         }
-#ifdef SONICR_XBOX
-        goto skip_text_entry_re;   /* no keyboard: see the main lobby */
-#endif
+        if (!CHAT_ENABLED()) {
+            goto skip_text_entry_re;   /* no keyboard: see the main lobby */
+        }
 
-        if (g_inputBits & 0x02) {
+        if (CHAT_CONFIRM()) {
             if (inputThrottle == 0) {
                 g_resultsTextBuffer[ns_slotQueueIdx] = -1;
                 memcpy((char *)g_resultsPlayerData + 9 * 0x104,
@@ -6863,7 +6884,7 @@ int NetworkScreenReentry(void)
                 PlaySoundEffect(0x1A, 0, 0);
             }
         }
-        else if (g_inputBits & 0x01) {
+        else if (CHAT_ERASE()) {
             if (inputThrottle == 0) {
                 if (ns_slotQueueIdx > 0) {
                     ns_slotQueueIdx--;

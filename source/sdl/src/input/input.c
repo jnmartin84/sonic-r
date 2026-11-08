@@ -642,7 +642,10 @@ void SyncJoystickSlots(void)
 int ScanTypedLetter(void)
 {
     int shiftMask = 0;
-    if (g_joyShiftFlag1 != 0 || g_joyShiftFlag2 != 0) {
+    /* 0x6758F6 / 0x675902 are g_diKeyboardState[0x2A] / [0x36] (left/right
+     * shift) in the binary's layout; the separate statics are never set. */
+    if (g_joyShiftFlag1 != 0 || g_joyShiftFlag2 != 0
+        || g_diKeyboardState[0x2A] != 0 || g_diKeyboardState[0x36] != 0) {
         shiftMask = 0x10000;
     }
 

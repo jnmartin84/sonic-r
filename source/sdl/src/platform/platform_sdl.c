@@ -713,12 +713,25 @@ static void HandleSDLEvent(SDL_Event *event)
     }
 }
 
+#ifdef SONICR_XBOX
+/* nxdk's SDL sends no key events: the key state is the USB keyboard's. */
+extern void xbox_kbd_merge(unsigned char *keys);
+static void xb_refresh_keys(void)
+{
+    memset(s_keystate, 0, sizeof(s_keystate));
+    xbox_kbd_merge(s_keystate);
+}
+#else
+static void xb_refresh_keys(void) { }
+#endif
+
 int platform_poll_events(unsigned char *keystateOut, int keystateSize)
 {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         HandleSDLEvent(&event);
     }
+    xb_refresh_keys();
 
     /* Copy keystate to caller's buffer */
     int copySize = keystateSize < 256 ? keystateSize : 256;
@@ -737,6 +750,7 @@ void platform_pump_events(void)
     while (SDL_PollEvent(&event)) {
         HandleSDLEvent(&event);
     }
+    xb_refresh_keys();
 }
 
 /* =====================================================================

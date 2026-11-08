@@ -17,6 +17,7 @@ GEN_XISO  = $(XBE_TITLE).iso
 NXDK_DIR ?= $(CURDIR)/../../../nxdk
 NXDK_SDL  = y
 NXDK_NET  = y
+NXDK_USB_ENABLE_HID = y   # USB keyboards for the lobby chat (src/xbox_kbd.c)
 
 SDL_SRC := $(abspath $(CURDIR)/../sdl/src)
 XBOX_DIR := $(abspath $(CURDIR))
@@ -30,7 +31,8 @@ SRCS := $(shell find $(SDL_SRC) -name '*.c' ! \( $(EXCLUDE) \)) \
         $(XBOX_DIR)/src/xbox_net.c \
         $(XBOX_DIR)/src/xbox_entry.c \
         $(XBOX_DIR)/src/xbox_fastdraw.c \
-        $(XBOX_DIR)/src/xbox_fastmem.c
+        $(XBOX_DIR)/src/xbox_fastmem.c \
+        $(XBOX_DIR)/src/xbox_kbd.c
 
 # nxdk compiles its libraries (pdclib, pbkit, pbgl, SDL2, ...) with whatever
 # CFLAGS the project passes, and with no -O at all that means clang's -O0.

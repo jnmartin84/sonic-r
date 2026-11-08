@@ -218,7 +218,13 @@ void RenderResultsScreen(int screenMode, int playerOffset)
 
     /* Blinking cursor — 0x48a2b6-0x48a2f3
      * if (g_totalFrames & 0xf) < 8: cursor at (textEndX-6, baseY-6) */
+#ifdef SONICR_XBOX
+    extern int xbox_kbd_present(void);
+    /* Text cursor only when a USB keyboard can type into the chat line. */
+    if ((g_totalFrames & 0xf) < 8 && xbox_kbd_present()) {
+#else
     if ((g_totalFrames & 0xf) < 8) {
+#endif
         DrawTexturedQuad(textEndX - 6, baseY - 6, /* EAX=textEndX-6, EDX=esi-6 */
             0x3FF33333,              /* depth ≈ 1.9f */
             0x18, 0x20,              /* width=24, height=32 */

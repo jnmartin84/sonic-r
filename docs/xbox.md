@@ -156,8 +156,10 @@ UDP directly between the consoles/PCs, with UPnP to open the host's port.
   silence), the others keep racing: that character disappears, drops to last
   place and "<NAME> LEFT THE RACE" is shown. If the host goes, each client
   finishes the race offline and then returns to the host/join screen.
-  There is no typed lobby chat
-  (no keyboard). The host needs at least
+  The lobby chat works with a USB keyboard (boot-protocol HID, through a
+  controller-port USB adapter; read by `src/xbox_kbd.c`): type, Enter sends,
+  Backspace erases. Without a keyboard the chat line and its cursor are
+  hidden. The host needs at least
   one other player to start a race.
 - The console registers as platform `xbox`.
 

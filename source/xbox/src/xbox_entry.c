@@ -383,6 +383,10 @@ int main(void)
         fprintf(stderr, "Sonic R Xbox: started, build %s %s\n", __DATE__, __TIME__);
     }
     xb_udata_init();
+    {   /* USB keyboard (lobby chat): HID driver before SDL enumerates USB */
+        extern void xbox_kbd_init(void);
+        xbox_kbd_init();
+    }
     atexit(xb_exit_cleanup);
     xbox_install_exception_handler();
     xbox_log_mem("start");
