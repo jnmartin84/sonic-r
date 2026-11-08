@@ -5638,6 +5638,11 @@ int NetworkScreen(void)
 
         /* STATE 2: In lobby — character selection & sync */
         if (ns_lobbyState == 2) {                              /* 0x48B118 */
+            /* Re-announce our character every ~2 s (UDP, a lost CHAR_CHANGE
+             * would otherwise leave the others with the wrong character). */
+            if ((g_totalFrames & 0x3F) == 0x20) {
+                EnumNetworkSessions(1);
+            }
             /* Periodically re-enumerate sessions */
             if (ns_setupMode == 3) {                           /* modem: specific timing */
                 if ((int)(g_totalFrames * 0x3F) == 0x19) {     /* 0x48B12E */
@@ -6603,6 +6608,14 @@ int NetworkScreenReentry(void)
                 if (CreateNetworkSession(NS_STR_SESSION_PW, NS_STR_SESSION_NAME)) {
                     ns_setupMode = 1;
                     ns_lobbyState = 2;
+                    /* List the room on the matchmaker again, so new players
+                     * can find it between races (the listing from before the
+                     * race is gone by now). */
+                    if (MatchmakerHasToken() && MatchmakerGetUsername()[0]) {
+                        UpnpOpenPort(NET_PORT_DEFAULT);
+                        int csOk = MatchmakerCreateSession(MatchmakerGetUsername(), NET_PORT_DEFAULT);
+                        DebugLog("Reentry: matchmaker listing %s\n", csOk ? "created" : "failed");
+                    }
                     EnumNetworkSessions(1);
                     g_netEnumActive = 1;
                 }
@@ -6659,6 +6672,10 @@ int NetworkScreenReentry(void)
                 ns_lobbyState = 0;
                 ns_connectionMode = 0;
             }
+        }
+
+        if (ns_lobbyState == 2 && (g_totalFrames & 0x3F) == 0x20) {
+            EnumNetworkSessions(1);   /* re-announce our character (see NetworkScreen) */
         }
 
         if (ns_lobbyState == 2) {
@@ -7008,7 +7025,14 @@ render_frame_re:
                     DrawPixText(idLine, (640 - idW) / 2, 30, 2, 0xC0C0C0C0);
                 }
 
-                if (ns_lobbyState == 0) {
+                extern int g_netLastRole;
+                if (ns_lobbyState == 0 && g_netLastRole != 0) {
+                    /* Rejoining automatically after a race (see state 0). */
+                    const char *msg = "RETURNING TO LOBBY...";
+                    int w = PixTextWidth(msg, 3);
+                    DrawPixText(msg, (640 - w) / 2, 220, 3, 0xFFFFFFFF);
+                }
+                else if (ns_lobbyState == 0) {
                     const char *l1 = NETTXT_HOST;
                     const char *l2 = NETTXT_JOIN;
                     int w1 = PixTextWidth(l1, 4);

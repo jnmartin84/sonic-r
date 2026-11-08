@@ -1686,6 +1686,10 @@ void ApplyNetworkPlayerState(void)
                 DebugLog("Client: SLOT_ASSIGN slot=%d, host='%s'\n",
                          slot, net_get_slot_name(0));
                 s_haveSlotAssign = 1;
+                /* Tell everyone our character now: the CHAR_CHANGE sent when
+                 * we joined was dropped (no slot yet), so until the player
+                 * changed character the host raced us as the default one. */
+                EnumNetworkSessions(1);
             }
             continue;
         }
