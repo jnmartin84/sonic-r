@@ -64,3 +64,11 @@ $(XBOX_DIR)/src/xbox_fastmem.obj: CFLAGS += -fno-builtin
 # The game's main() is called from src/xbox_entry.c with a fixed argv, because
 # nxdk does not pass command-line arguments.
 $(SDL_SRC)/main.obj: CFLAGS += -Dmain=sonicr_main
+
+# cxbe always writes title ID 0xFFFF0002, which other homebrew shares; stamp
+# our own (FFFF5352) so saves stay in E:\UDATA\FFFF5352. This is the default
+# goal, so a plain `make` never ships an XBE with the generic ID.
+.DEFAULT_GOAL := sonicr
+.PHONY: sonicr
+sonicr: $(OUTPUT_DIR)/default.xbe
+	python3 $(XBOX_DIR)/tools/set_titleid.py $(OUTPUT_DIR)/default.xbe
