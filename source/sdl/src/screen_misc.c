@@ -86,6 +86,9 @@ void RenderResultsScreen(int screenMode, int playerOffset); /* 0x489D18 */
 void EnumNetworkSessions(int flag);                         /* 0x487180 */
 void OpenNetworkSession(int sessionIdx);                    /* 0x4871B4 */
 void InitNetworkGame(void);                                 /* 0x487A38 */
+void NetStartCountdownBegin(void);
+int  NetStartCountdownTick(void);
+int  NetStartCountdownSeconds(void);
 void UpdateNetworkSync(const void *data, int len);          /* 0x487644 */
 void StartNetworkThread(void);                              /* 0x487674 */
 void CloseDirectPlaySession(void);                          /* 0x4875CC */
@@ -4884,6 +4887,16 @@ static int PixTextWidth(const char *s, int pixSz)
     return len * charW;
 }
 
+/* Lobby: "RACE STARTS IN N" while the host's start countdown runs. */
+static void NetStartCountdownDraw(void)
+{
+    int secs = NetStartCountdownSeconds();
+    if (secs <= 0) return;
+    char line[32];
+    snprintf(line, sizeof(line), "RACE STARTS IN %d", secs);
+    DrawPixText(line, (640 - PixTextWidth(line, 4)) / 2, 404, 4, 0xFFFFFF40);
+}
+
 /* ─ Sign-in QR rendering helper ─ */
 static void RenderSignInScreen(const uint8_t *qrBuf, int qrSize,
                                const char *code, int authState)
@@ -5753,7 +5766,7 @@ int NetworkScreen(void)
                     if (ns_connectionMode == 0) {              /* 0x48B17A */
                         DebugLog("F1 in lobby: gameStarted=%d playerCount=%d\n", g_netGameStarted, g_netPlayerCount);
                         if (g_netPlayerCount >= 2) {           /* host + at least one client */
-                            InitNetworkGame();                 /* 0x487A38 */
+                            NetStartCountdownBegin();          /* 5 s countdown, then InitNetworkGame */
                         }
                         lastTickSec = timeGetTime() / 1000;
                     }
@@ -5762,6 +5775,10 @@ int NetworkScreen(void)
                 else {
                     ns_connectionMode = 0;
                 }
+            }
+
+            if (NetStartCountdownTick()) {
+                InitNetworkGame();                             /* 0x487A38 */
             }
 
             /* Check if multiplayer session is now live */
@@ -6390,6 +6407,7 @@ render_frame:
             }
 
             NetDbgDraw();
+            NetStartCountdownDraw();
 
             if (g_fadeLevel < 0) {
                 RenderFadeOverlay();
@@ -6786,7 +6804,7 @@ int NetworkScreenReentry(void)
                 if (g_diKeyboardState[0x3B]) {
                     if (ns_connectionMode == 0) {
                         if (g_netPlayerCount >= 2) {           /* host + at least one client */
-                            InitNetworkGame();
+                            NetStartCountdownBegin();          /* 5 s countdown, then InitNetworkGame */
                         }
                         lastTickSec = timeGetTime() / 1000;
                     }
@@ -6795,6 +6813,10 @@ int NetworkScreenReentry(void)
                 else {
                     ns_connectionMode = 0;
                 }
+            }
+
+            if (NetStartCountdownTick()) {
+                InitNetworkGame();
             }
 
             if (g_netSessionActive != 0) {
@@ -7161,6 +7183,8 @@ render_frame_re:
                 StringToGlyphIds(MatchmakerGetUsername(), glyphs, MM_MAX_USERNAME);
                 DrawGlyphString(20 + 26, 60, glyphs, MM_MAX_USERNAME);
             }
+
+            NetStartCountdownDraw();
 
             if (g_fadeLevel < 0) {
                 RenderFadeOverlay();

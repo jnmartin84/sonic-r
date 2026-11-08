@@ -37,6 +37,7 @@
 #define NET_MSG_PAUSE       0xFFF00090   /* any → all (host relays): race paused (1) / resumed (0) by slot */
 #define NET_MSG_ACTIVE_MASK 0xFFF000A0   /* host → clients (10 Hz in race): bit i set = slot i still racing */
 #define NET_MSG_HOST_LEFT   0xFFF000B0   /* host → clients: host is closing the session */
+#define NET_MSG_START_COUNTDOWN 0xFFF000C0 /* host → clients (lobby, 4 Hz): seconds to the start, 0 = cancelled */
 
 /* Snapshot networking (in-race, replaces lockstep) */
 #define NET_MSG_SNAPSHOT      0xFFF0005F   /* host → clients: world snapshot (10 Hz) */

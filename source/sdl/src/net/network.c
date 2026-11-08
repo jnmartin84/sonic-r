@@ -158,9 +158,14 @@ static int s_levelGoReceived;   /* client: set to 1 when host sends LEVEL_GO */
 static int s_startAckMask;      /* bitmask: bit N set when slot N acks START_GAME */
 
 
+static void host_drop_racer(int slot);
+static void client_lost_host(const char *why);
+#define NET_BARRIER_TIMEOUT_MS 30000u   /* longest wait for the others to load */
+
 void NetLevelSyncBarrier(void)
 {
     extern void platform_pump_events(void);
+    DWORD barrierStart = timeGetTime();
 
     if (g_netSessionActive == 0 || !net_is_active()) return;
 
@@ -178,8 +183,27 @@ void NetLevelSyncBarrier(void)
 
         DebugLog("Host: waiting for all peers (expected mask=0x%x)\n", expectedMask);
 
-        /* Pump until everyone reports in */
-        while (s_levelReadyMask != expectedMask) {
+        /* A client that never acknowledged START_GAME is not loading this
+         * race: take it out now instead of waiting for it. */
+        for (int i = 1; i < g_netPlayerCount && i < NET_MAX_PLAYERS; i++) {
+            if (!(s_startAckMask & (1 << i))) {
+                DebugLog("Host: slot %d never acked START_GAME - removed from the race\n", i);
+                host_drop_racer(i);
+                expectedMask &= ~(1 << i);
+            }
+        }
+
+        /* Pump until everyone reports in (or give up on the slow ones) */
+        while ((s_levelReadyMask & expectedMask) != expectedMask) {
+            if (timeGetTime() - barrierStart > NET_BARRIER_TIMEOUT_MS) {
+                for (int i = 1; i < NET_MAX_PLAYERS; i++) {
+                    if ((expectedMask & (1 << i)) && !(s_levelReadyMask & (1 << i))) {
+                        DebugLog("Host: slot %d did not finish loading - removed from the race\n", i);
+                        host_drop_racer(i);
+                    }
+                }
+                break;
+            }
             ApplyNetworkPlayerState();
             platform_pump_events();
 #ifdef SONICR_DC
@@ -212,6 +236,10 @@ void NetLevelSyncBarrier(void)
 
         /* Wait for host's GO */
         while (!s_levelGoReceived) {
+            if (timeGetTime() - barrierStart > NET_BARRIER_TIMEOUT_MS || !net_is_active()) {
+                if (net_is_active()) client_lost_host("THE HOST DID NOT START THE RACE");
+                return;
+            }
             ApplyNetworkPlayerState();
             platform_pump_events();
 #ifdef SONICR_DC
@@ -950,6 +978,73 @@ static void client_lost_host(const char *why)
     CloseDirectPlaySession();
 }
 
+/* ---- 5-second start countdown in the lobby ---------------------------------
+ * The host's start button no longer starts the race at once: a 5 s countdown
+ * runs on every machine first ("RACE STARTS IN 5..1"), during which the
+ * clients re-send their character and everyone's lobby data settles. */
+#define NET_START_COUNTDOWN_MS 5000u
+static DWORD s_scEndMs;          /* host: countdown end, 0 = none */
+static DWORD s_scLastSend;
+static int   s_scClientSecs;     /* client: seconds shown, 0 = none */
+static DWORD s_scClientUntil;
+
+static void sc_send(int secs)
+{
+    char b[8];
+    wl32(b + 0, (uint32_t)NET_MSG_START_COUNTDOWN);
+    wl32(b + 4, (uint32_t)secs);
+    net_broadcast(b, 8);
+    s_scLastSend = timeGetTime();
+}
+
+void NetStartCountdownBegin(void)
+{
+    if (s_scEndMs != 0 || !net_is_host()) return;
+    s_scEndMs = timeGetTime() + NET_START_COUNTDOWN_MS;
+    if (s_scEndMs == 0) s_scEndMs = 1;
+    DebugLog("Host: start countdown (%d players)\n", g_netPlayerCount);
+    sc_send(5);
+}
+
+void NetStartCountdownCancel(void)
+{
+    if (s_scEndMs == 0) return;
+    s_scEndMs = 0;
+    for (int k = 0; k < 3; k++) sc_send(0);
+    DebugLog("Host: start countdown cancelled\n");
+}
+
+/* Host, once per lobby frame: 1 when the countdown is over (start the race). */
+int NetStartCountdownTick(void)
+{
+    if (s_scEndMs == 0) return 0;
+    if (!net_is_active() || !net_is_host() || g_netPlayerCount < 2) {
+        NetStartCountdownCancel();
+        return 0;
+    }
+    DWORD now = timeGetTime();
+    int left = (int)(s_scEndMs - now);
+    if (left <= 0) {
+        s_scEndMs = 0;
+        DebugLog("Host: start countdown over - starting\n");
+        return 1;
+    }
+    if (now - s_scLastSend >= 250) sc_send((left + 999) / 1000);
+    return 0;
+}
+
+/* Seconds to show in the lobby (both sides), 0 = no countdown. */
+int NetStartCountdownSeconds(void)
+{
+    DWORD now = timeGetTime();
+    if (s_scEndMs != 0) {
+        int left = (int)(s_scEndMs - now);
+        return left <= 0 ? 1 : (left + 999) / 1000;
+    }
+    if (s_scClientSecs > 0 && (int)(now - s_scClientUntil) < 0) return s_scClientSecs;
+    return 0;
+}
+
 void SendNetworkHostData(void)
 {
     int i;
@@ -1118,6 +1213,8 @@ void CloseDirectPlaySession(void)
     }
     s_haveSlotAssign = 0;
     memset(s_hostSlotLastRecvMs, 0, sizeof(s_hostSlotLastRecvMs));
+    s_scEndMs = 0;                  /* no start countdown carries into the next session */
+    s_scClientSecs = 0;
 
     /* Host/client discriminator, set to 1 by CreateNetworkSession (main.c).
      * Session-scoped: clearing it here keeps it symmetric with where it is
@@ -1596,6 +1693,16 @@ void ApplyNetworkPlayerState(void)
             }
             continue;
         }
+        if (!net_is_host() && header == NET_MSG_START_COUNTDOWN && len >= 8) {
+            int secs = rl32s(buf + 4);
+            if (secs > 0 && s_scClientSecs == 0) {
+                DebugLog("Client: host started the countdown\n");
+                EnumNetworkSessions(1);               /* make sure the host has our pick */
+            }
+            s_scClientSecs = secs > 0 ? secs : 0;
+            s_scClientUntil = timeGetTime() + 1500;
+            continue;
+        }
         if (!net_is_host() && header == NET_MSG_HOST_LEFT) {
             if (g_netSessionActive && g_introCountdown == 0 && g_postRaceCameraMode == 0
                 && g_netDisconnectFlag == 0) {
@@ -1930,6 +2037,8 @@ void ApplyNetworkPlayerState(void)
                     }
                 }
             }
+
+            s_scClientSecs = 0;
 
             /* Run the same init as the host */
             InitNetworkGame();

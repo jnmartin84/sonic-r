@@ -148,6 +148,10 @@ UDP directly between the consoles/PCs, with UPnP to open the host's port.
   on resume all players get a 3-2-1 countdown, and a race left paused for
   120 s ends and everyone returns to the host/join screen. Players on
   different machines collide with each other like offline opponents.
+  When the host starts, a 5 s "RACE STARTS IN N" countdown runs on every
+  machine first. Loading has a 30 s limit: a player who does not finish
+  loading is left out of the race instead of keeping the others on a black
+  screen.
   If a player quits or loses the connection mid-race (clean exit, or 5 s of
   silence), the others keep racing: that character disappears, drops to last
   place and "<NAME> LEFT THE RACE" is shown. If the host goes, each client
