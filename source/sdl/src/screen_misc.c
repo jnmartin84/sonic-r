@@ -4745,8 +4745,14 @@ static int MeasureGlyphString(const int *glyphIds, int maxCount)
     return x;
 }
 
+/* Set while a network screen fades out. The pixel-font text is drawn at
+ * z=0.01, in front of the iris fade (z=1.1), so it used to stay on the black
+ * screen until the next menu had loaded. */
+static int s_pixTextHidden;
+
 static void DrawPixText(const char *s, int x, int y, int pixSz, uint32_t color)
 {
+    if (s_pixTextHidden) return;
     int charW = 5 * pixSz + pixSz;
     float z = 0.01f;
     for (int k = 0; s[k]; k++) {
@@ -5058,6 +5064,7 @@ int NetworkScreen(void)
                         UpdateFade();
                     }
                     if (g_fadeLevel == (int)0xFFFFFF00) {
+                        s_pixTextHidden = 0;
                         return g_screenResult;
                     }
 
@@ -5102,6 +5109,7 @@ int NetworkScreen(void)
                     /* Render */
                     ProcessTpageStates();
                     BeginFrame();
+                    s_pixTextHidden = (g_fadeState == 2);   /* fading out: drop the pixel-font text (it sits in front of the iris) */
                     RenderBackground();
                     EndFrame();
 
@@ -5354,6 +5362,7 @@ int NetworkScreen(void)
 
             UpnpClosePort(NET_PORT_DEFAULT);
             MatchmakerClearSession();
+            s_pixTextHidden = 0;
             return g_screenResult;                            /* 0x48AC1F: eax = [0x925418] */
         }
 
@@ -5941,6 +5950,7 @@ render_frame:
             g_polyCount = 0;
             ProcessTpageStates();                                   /* 0x4323CC */
             BeginFrame();                                      /* 0x42299C */
+            s_pixTextHidden = (g_fadeState == 2);   /* fading out: drop the pixel-font text (it sits in front of the iris) */
             RenderBackground();                                /* 0x435868 */
 
             /* Lobby contents (character podium, track/mode models, lobby
@@ -6509,6 +6519,7 @@ int NetworkScreenReentry(void)
                 }
             }
 
+            s_pixTextHidden = 0;
             return g_screenResult;                             /* 0x48AC1F: eax = [0x925418] */
         }
 
@@ -6848,6 +6859,7 @@ render_frame_re:
             g_polyCount = 0;
             ProcessTpageStates();
             BeginFrame();
+            s_pixTextHidden = (g_fadeState == 2);   /* fading out: drop the pixel-font text (it sits in front of the iris) */
             RenderBackground();
             if (ns_lobbyState >= 2) {
                 int charId = (int)(signed short)g_menuPlayer.charId;
