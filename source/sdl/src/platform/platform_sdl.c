@@ -22,7 +22,6 @@
 #include "platform.h"
 #ifdef SONICR_XBOX
 #include <hal/video.h>   /* XVideoSetMode */
-#include <xboxkrnl/xboxkrnl.h>   /* MmQueryStatistics (watchdog) */
 #include <pbgl.h>        /* OpenGL 1.x on the NV2A */
 #include <pbkit/pbkit.h>
 #endif
@@ -959,22 +958,6 @@ static int xb_watchdog(void *arg)
                 fprintf(stderr, "WATCHDOG: no frame for %d s, last mark: %s\n", stalled,
                         (const char *)g_lastMark);
                 fflush(stderr);
-            }
-            /* A hang can leave stderr locked or its buffer unwritten, so long
-             * stalls also go to a separate file, opened and closed each time. */
-            if (stalled == 6 || (stalled > 6 && stalled % 15 == 0)) {
-                extern int pb_busy(void);
-                FILE *h = fopen("D:\\HANG.LOG", "a");
-                if (h) {
-                    MM_STATISTICS ms;
-                    ms.Length = sizeof(ms);
-                    MmQueryStatistics(&ms);
-                    fprintf(h, "frame %d: no new frame for %d s, last mark '%s', GPU %s, free %lu KB\n",
-                            g_xbFrames, stalled, (const char *)g_lastMark,
-                            pb_busy() ? "busy" : "idle",
-                            (unsigned long)(ms.AvailablePages * 4));
-                    fclose(h);
-                }
             }
         } else {
             stalled = 0;
