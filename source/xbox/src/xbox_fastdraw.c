@@ -72,6 +72,27 @@ void xb_draw_fan(const float *verts, int n)
         s_open = 1;
     }
 
+    /* Bilinear on texture atlases: a polygon whose UVs run right up to the
+     * edge of its tile also samples half a texel of the NEIGHBOURING tile,
+     * which showed up as thin coloured lines and dots along polygon edges
+     * (fences, grass borders, cliffs). Pull the UVs at the edge of each
+     * polygon's UV box in by half a texel (tpages are 256x256). */
+    extern int g_xbLinearNow;
+    float uMin = 0.f, uMax = 0.f, vMin = 0.f, vMax = 0.f;
+    int inset = 0;
+    if (g_xbLinearNow && n >= 3) {
+        uMin = uMax = verts[8];
+        vMin = vMax = verts[9];
+        for (int i = 1; i < n; i++) {
+            float uu = verts[i * 10 + 8], vv = verts[i * 10 + 9];
+            if (uu < uMin) uMin = uu; else if (uu > uMax) uMax = uu;
+            if (vv < vMin) vMin = vv; else if (vv > vMax) vMax = vv;
+        }
+        const float half = 0.5f / 256.f;
+        if (uMax - uMin > 2.f * half) { uMin += half; uMax -= half; inset |= 1; }
+        if (vMax - vMin > 2.f * half) { vMin += half; vMax -= half; inset |= 2; }
+    }
+
     uint32_t *p = s_p;
     p = push_command_parameter(p, NV097_SET_BEGIN_END, GL_TRIANGLE_FAN + 1);
 
@@ -87,8 +108,11 @@ void xb_draw_fan(const float *verts, int n)
         for (int u = 0; u < TEXUNIT_COUNT; ++u) {
             if (pbgl.tex[u].enabled) {
                 p = push_command(p, NV097_SET_VERTEX_DATA4F_M + (NV2A_VERTEX_ATTR_TEXTURE0 + u) * 4 * 4, 4);
-                p = push_float(p, v[8]);
-                p = push_float(p, v[9]);
+                float tu = v[8], tv = v[9];
+                if (inset & 1) tu = tu < uMin ? uMin : (tu > uMax ? uMax : tu);
+                if (inset & 2) tv = tv < vMin ? vMin : (tv > vMax ? vMax : tv);
+                p = push_float(p, tu);
+                p = push_float(p, tv);
                 p = push_float(p, 0.f);
                 p = push_float(p, 1.f);
             }

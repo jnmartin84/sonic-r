@@ -140,8 +140,14 @@ static void GL_ApplyTpageFilter(int tp)
      * the Xbox for the 3D race scene (Back + R3 toggles it); 2D screens and
      * the HUD stay point-sampled. */
     {
-        extern int g_xbBilinear, g_xb3D;
-        if (g_xbBilinear && g_xb3D) want = (unsigned char)(R_FILTER_LINEAR + 1);
+        extern int g_xbBilinear, g_xb3D, g_xbLinearNow;
+        extern int g_tpageCount;   /* the sky/parallax atlas tpage */
+        /* The parallax/sky tpage is a folded atlas (strips side by side in
+         * one texture): bilinear blends the neighbouring strip in at every
+         * strip join, which drew thin vertical lines across the sky and its
+         * water reflection. Keep it point-sampled, as the renderer asks. */
+        if (g_xbBilinear && g_xb3D && tp != g_tpageCount) want = (unsigned char)(R_FILTER_LINEAR + 1);
+        g_xbLinearNow = (want == (unsigned char)(R_FILTER_LINEAR + 1));
     }
 #endif
     if (s_glTextureFilter[tp] != want) {
@@ -199,6 +205,12 @@ void R_FlushState(void)
         g_tpagePixelBuf[s_desired.textureId] != NULL) {
         GL_ApplyTpageFilter(s_desired.textureId);
     }
+#ifdef SONICR_XBOX
+    else {
+        extern int g_xbLinearNow;
+        g_xbLinearNow = 0;
+    }
+#endif
 
     /* Depth test */
     if (s_desired.depthTest != s_current.depthTest) {
@@ -491,6 +503,7 @@ void R_DebugGetState(int *depthTest, int *depthWrite, int *depthFunc,
 
 #ifdef SONICR_XBOX
 int g_xbBilinear = 1;
+int g_xbLinearNow;   /* bound texture is bilinear-filtered (xb_draw_fan UV inset) */
 int g_xb3D;        /* set by RenderHUD around the 3D scene */
 /* Forget which filter each texture object has, so the next bind re-applies. */
 void R_InvalidateTextureFilters(void)
