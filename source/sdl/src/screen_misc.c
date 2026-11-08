@@ -4700,11 +4700,13 @@ static int s_pickerPrevState = -1;
 #define NETTXT_HOST         "PRESS A TO HOST"
 #define NETTXT_JOIN         "PRESS RT TO JOIN"
 #define NETTXT_PICKER_HINT  "UP/DOWN SELECT - A JOIN - Y LAN - B BACK"
+#define NETTXT_LANHOST      "PRESS Y TO HOST LAN ONLY"
 #else
 #define NETTXT_LAN_PROMPT   "PRESS F3 FOR LAN PLAY"
 #define NETTXT_HOST         "PRESS F1 TO HOST"
 #define NETTXT_JOIN         "PRESS F2 TO JOIN"
 #define NETTXT_PICKER_HINT  "UP/DOWN SELECT - ENTER JOIN - F3 LAN - ESC BACK"
+#define NETTXT_LANHOST      "PRESS F3 TO HOST LAN ONLY"
 #endif
 
 static int StringToGlyphIds(const char *s, int *out, int maxOut)
@@ -4976,6 +4978,8 @@ static void NetSynthPadKeys(void)
 static void NetSynthPadReset(void) { }
 static void NetSynthPadKeys(void) { }
 #endif
+
+static int s_lanOnlyHost;   /* set by F3/Y in state 0: host without matchmaker */
 
 int NetworkScreen(void)
 {
@@ -5416,6 +5420,16 @@ int NetworkScreen(void)
                     lastTickSec = timeGetTime() / 1000;
                     PlaySoundEffect(2, 0, 0);
                 }
+                /* F3 (Y on a pad) = host on the local network only, without
+                 * listing the session on the matchmaker. LAN players find
+                 * any host by broadcast, so this just skips the online
+                 * registration. */
+                if (g_diKeyboardState[0x3D] && g_netProviderChoice == -1) {
+                    g_netProviderChoice = 0;
+                    s_lanOnlyHost = 1;
+                    lastTickSec = timeGetTime() / 1000;
+                    PlaySoundEffect(2, 0, 0);
+                }
             }
 
             /* Process provider choice */
@@ -5429,7 +5443,12 @@ int NetworkScreen(void)
                 if (CreateNetworkSession(NS_STR_SESSION_PW, NS_STR_SESSION_NAME)) {
                     ns_setupMode = 1;                          /* [0x68AFD0] = 1 */
                     ns_lobbyState = 2;                         /* skip state 1 */
-                    if (MatchmakerHasToken()) {
+                    if (s_lanOnlyHost) {
+                        s_lanOnlyHost = 0;
+                        NetDbgPush("LAN ONLY HOST");
+                        DebugLog("Host: LAN only (not listed on the matchmaker)\n");
+                    }
+                    else if (MatchmakerHasToken()) {
                         UpnpOpenPort(NET_PORT_DEFAULT);
                         int csOk = MatchmakerCreateSession(MatchmakerGetUsername(), NET_PORT_DEFAULT);
                         NetDbgPush("CREATE %s ID %lld USER %s",
@@ -6047,6 +6066,11 @@ render_frame:
                     int w2 = PixTextWidth(l2, 4);
                     DrawPixText(l1, (640 - w1) / 2, 200, 4, 0xFFFFFFFF);
                     DrawPixText(l2, (640 - w2) / 2, 250, 4, 0xFFFFFFFF);
+                    if (MatchmakerHasToken()) {
+                        const char *l3 = NETTXT_LANHOST;
+                        int w3 = PixTextWidth(l3, 3);
+                        DrawPixText(l3, (640 - w3) / 2, 310, 3, 0xC0C0C0C0);
+                    }
                 }
                 else /* ns_lobbyState == 1 */ {
                     const char *msg = "SEARCHING FOR SESSIONS...";
@@ -6098,10 +6122,19 @@ render_frame:
                 int picker_count = g_mmSessionList.count;
                 int rowY = 130;
                 int rowH = 28;
+#ifdef SONICR_XBOX
+                /* Keep the row inside the TV-safe area (the "1/4" column
+                 * at x=580 was cut by overscan). */
+                int rowX = 70;
+                int countryX = 380;
+                int pingX = 440;
+                int countX = 536;
+#else
                 int rowX = 80;
                 int countryX = 420;
                 int pingX = 470;
                 int countX = 580;
+#endif
 
                 int cursor = s_pickerCursor;
 
@@ -6121,9 +6154,17 @@ render_frame:
                             /* z=3.0 puts the highlight bar behind the
                              * glyph text (DrawGlyphString uses z=2.0)
                              * so the username renders on top of it. */
+#ifdef SONICR_XBOX
+                            /* Dark bar: the white pixel-font text (country,
+                             * ping, player count) vanished on the light one. */
+                            R_DrawQuad2DSolid(rowX - 10, y - 4,
+                                              countX + 64, y + 24,
+                                              3.0f, 0xC0102870);
+#else
                             R_DrawQuad2DSolid(rowX - 10, y - 4,
                                               countX + 60, y + 24,
                                               3.0f, 0x80FFFFFF);
+#endif
                         }
                         int glyphs[MM_MAX_USERNAME];
                         StringToGlyphIds(g_mmSessionList.sessions[i].host_name,

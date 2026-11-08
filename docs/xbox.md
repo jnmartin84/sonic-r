@@ -134,7 +134,10 @@ UDP directly between the consoles/PCs, with UPnP to open the host's port.
   is written to UDATA; `source/xbox/tools/make_net00_patch.py` builds the
   patch), and the text prompts ("PRESS A TO HOST", "PRESS RT TO JOIN", the
   session list hint) name the pad buttons too. In the online session list,
-  D-pad up/down selects and A or Start joins. There is no typed lobby chat
+  D-pad up/down selects and A or Start joins; Y there searches the local
+  network instead. On the host/join screen, Y hosts a LAN-only game (not listed
+  on the matchmaker); an online host (A) can also be joined over the LAN.
+  There is no typed lobby chat
   (no keyboard). The host needs at least
   one other player to start a race.
 - The console registers as platform `xbox`.
