@@ -8,6 +8,8 @@
  * ResetInputState - screen transition reset
  */
 
+#include <string.h>
+#include "gamepad_buttons.h"
 #include "sonicr_types.h"
 #include "sonicr_globals.h"
 #include "sonicr_functions.h"
@@ -567,6 +569,15 @@ void SaveKeyMappings(void)
  * LoadJoystickConfig - 0x00477d14 - 63 bytes
  * Load joystick.inf - reads 1128 bytes into joystick config.
  */
+#ifdef SONICR_XBOX
+/* Xbox pad buttons past the ten the JOYSTICK.INF slot layout can hold (Black,
+ * the L/R triggers): their bindings live here, per slot, and are appended to
+ * JOYSTICK.INF after the four original slots. valid=0 means "never remapped:
+ * use the shared defaults" (g_joystickConfigWords). */
+short g_joyExtCfg[4][XB_EXT_BUTTONS];
+unsigned char g_joyExtValid[4];
+#endif
+
 void LoadJoystickConfig(void)
 {
     FILE *fp = fOpen("JOYSTICK.INF", "rb");
@@ -577,6 +588,19 @@ void LoadJoystickConfig(void)
         for (int s = 0; s < 4; s++) {
             bswap16_arr(g_joystickConfig + s * 0x11a + 0x104, 11);
         }
+#ifdef SONICR_XBOX
+        {
+            char magic[4];
+            unsigned char valid[4];
+            short cfg[4][XB_EXT_BUTTONS];
+            if (fRead(magic, 1, 4, fp) == 4 && memcmp(magic, "XEXT", 4) == 0
+                && fRead(valid, 1, 4, fp) == 4
+                && fRead(cfg, sizeof(cfg), 1, fp) == 1) {
+                memcpy(g_joyExtValid, valid, sizeof(valid));
+                memcpy(g_joyExtCfg, cfg, sizeof(cfg));
+            }
+        }
+#endif
         fClose(fp);
     }
 }
@@ -626,6 +650,9 @@ void SyncJoystickSlots(void)
             }
 
             *(short *)(slotBase + 0x118) = g_joystickDeviceFlags[i];
+#ifdef SONICR_XBOX
+            g_joyExtValid[i] = 0;          /* new device: extra buttons back to defaults */
+#endif
         }
     }
 }

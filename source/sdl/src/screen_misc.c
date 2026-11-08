@@ -5,6 +5,7 @@
  * OptionsMenuScreen, LoadSaveScreen, TimeRankingScreen, NetworkScreen.
  */
 
+#include "gamepad_buttons.h"
 #include "sonicr_types.h"
 #include "sonicr_globals.h"
 #include "sonicr_functions.h"
@@ -191,7 +192,7 @@ static int g_optMusicTestSel;              /* 0x0068AF38 — Music Test selector
 static int s_musicTestTrack = -1;
 static int __attribute__((unused)) g_optSplashState;              /* 0x0068AF70 */
 
-static short g_optKeyRemapResult[16];     /* 0x0068B040 — remap output key IDs */
+static short g_optKeyRemapResult[32];     /* 0x0068B040 — remap output key IDs (16 in the binary; 32 so the Xbox triggers fit) */
 static int   s_optKeyRemapTemp[10];       /* stack temp [ebp-0x50] in binary —
                                            * snapshot of current keymap for
                                            * cancel/restore via ESC */
@@ -240,7 +241,7 @@ static const short g_remapActionBits[4][6] = {
 /* Per-button "already-mapped this session" flag at 0x68b02c.
  * ScanKeyRemap checks/sets this so the user can't bind the same button
  * to two different actions in one remap pass. Cleared on entry. */
-static short s_remapMappedFlag[16];
+static short s_remapMappedFlag[32];
 
 /* ROM SFX test table at 0x50421A — sound IDs indexed by g_optSfxTestSel.
  * Binary reads dword at [vol*2 + 0x50421A], then sar 16 → table[vol+1]. */
@@ -295,11 +296,29 @@ void SetPlayerCharacter(int playerIndex, int charId, int raceType)
  *   g_joystickDeviceFlags, which platform_init_gamepads writes from
  *   SDL_JoystickNumButtons).
  */
+/* Xbox: buttons the remap may capture. Back cancels the remap, Guide does
+ * not exist and the D-pad steers, so those keep their fixed meaning; Black
+ * and the L/R triggers (past the ten slot words) are capturable. */
+#ifdef SONICR_XBOX
+static int RemapButtonAllowed(int b)
+{
+    return !(b == GCBTN_BACK || b == GCBTN_GUIDE ||
+             (b >= GCBTN_DPAD_UP && b <= GCBTN_DPAD_RIGHT));
+}
+#else
+#define RemapButtonAllowed(b) 1
+#endif
+
 static void ScanKeyRemap(char *slotPtr)
 {
     int btnCount   = *(short *)(slotPtr + 0x118);
     int playerSlot = g_optKeyRemapPlayer;
     int pressBase  = playerSlot * 80;            /* g_keyPressState stride */
+#ifdef SONICR_XBOX
+    if (btnCount >= JOY_SLOT_CFG_WORDS) {
+        btnCount = GC_BUTTON_COUNT;              /* include Black and the triggers */
+    }
+#endif
 
     /* Two modes:
      *   flag != 0: a button was just captured; wait until ALL buttons
@@ -318,7 +337,7 @@ static void ScanKeyRemap(char *slotPtr)
     }
 
     for (int btn = 0; btn < btnCount; btn++) {
-        if (g_keyPressState[pressBase + btn] == 0) {
+        if (g_keyPressState[pressBase + btn] == 0 || !RemapButtonAllowed(btn)) {
             continue;
         }
 
@@ -329,7 +348,8 @@ static void ScanKeyRemap(char *slotPtr)
         }
         s_remapMappedFlag[btn] = 1;
 
-        int cappedCount = btnCount > 6 ? 6 : btnCount;
+        int baseCount = *(short *)(slotPtr + 0x118);   /* action list: as before */
+        int cappedCount = baseCount > 6 ? 6 : baseCount;
         int row = cappedCount - 3;
         if (row < 0) {
             row = 0;
@@ -1869,7 +1889,7 @@ int OptionsMenuScreen(void)
                             g_optKeyRemapFlag     = 1;        /* wait-for-release */
                             g_optKeyRemapPlayer   = slot;     /* 0x68b024 */
                             g_optEscGate          = 1;        /* gate2 */
-                            for (int i = 0; i < 10; i++) {
+                            for (int i = 0; i < 32; i++) {   /* every capturable button, triggers included */
                                 g_optKeyRemapResult[i] = 0;
                                 s_remapMappedFlag[i]   = 0;
                             }
@@ -2114,6 +2134,22 @@ int OptionsMenuScreen(void)
                         }
                         dst[i] = g_optKeyRemapResult[i];
                     }
+#ifdef SONICR_XBOX
+                    /* Black and the triggers: same rule, into the extra table. */
+                    if (playerSlot >= 0 && playerSlot < 4) {
+                        short *ext = g_joyExtCfg[playerSlot];
+                        if (!g_joyExtValid[playerSlot]) {
+                            for (int i = 0; i < XB_EXT_BUTTONS; i++) {
+                                ext[i] = g_joystickConfigWords[i];
+                            }
+                            g_joyExtValid[playerSlot] = 1;
+                        }
+                        for (int i = JOY_SLOT_CFG_WORDS; i < XB_EXT_BUTTONS; i++) {
+                            if (!RemapButtonAllowed(i)) continue;   /* D-pad etc. stay */
+                            ext[i] = g_optKeyRemapResult[i];
+                        }
+                    }
+#endif
 #if 0
                     fprintf(stderr,
                         "[joy-remap] complete — committed %d button(s) to slot %d\n",

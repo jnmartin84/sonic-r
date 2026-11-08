@@ -894,6 +894,11 @@ int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots)
                 cfg = slotCfg[b];
             } else if (b < JOY_CFG_MAX) {
                 cfg = g_joystickConfigWords[b];
+#ifdef SONICR_XBOX
+                if (i < 4 && g_joyExtValid[i] && b < XB_EXT_BUTTONS) {
+                    cfg = g_joyExtCfg[i][b];   /* remapped Black / trigger */
+                }
+#endif
             } else {
                 cfg = 0;
             }

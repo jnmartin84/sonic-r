@@ -7,6 +7,7 @@
  * and save/load helpers.
  */
 
+#include "gamepad_buttons.h"
 #include "sonicr_types.h"
 #include "sonicr_globals.h"
 #include "sonicr_functions.h"
@@ -345,6 +346,11 @@ void SavePadTypesImpl(void)
         for (int s = 0; s < 4; s++) {
             bswap16_arr(g_joystickSlots[s] + 0x104, 11);
         }
+#ifdef SONICR_XBOX
+        fWrite("XEXT", 1, 4, fp);                       /* extra Xbox buttons */
+        fWrite(g_joyExtValid, 1, 4, fp);
+        fWrite(g_joyExtCfg, sizeof(g_joyExtCfg), 1, fp);
+#endif
         fClose(fp);
     }
 }

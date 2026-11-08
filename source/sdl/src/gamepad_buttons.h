@@ -61,4 +61,12 @@
  * which GC_BUTTON_COUNT on its own would overrun. */
 #define JOY_SLOT_CFG_WORDS   10
 
+#ifdef SONICR_XBOX
+/* Xbox: buttons JOY_SLOT_CFG_WORDS..GC_BUTTON_COUNT-1 (Black, L/R triggers)
+ * are remappable too; their bindings are kept in g_joyExtCfg (input.c). */
+#define XB_EXT_BUTTONS       GC_BUTTON_COUNT
+extern short g_joyExtCfg[4][XB_EXT_BUTTONS];
+extern unsigned char g_joyExtValid[4];
+#endif
+
 #endif /* GAMEPAD_BUTTONS_H */
