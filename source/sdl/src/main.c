@@ -315,6 +315,8 @@ static int JoinHostIp(const char *hostIp)
  * owner does the mirror-image check on its side), so both get pushed apart as
  * in offline play. The remote player is treated as standing still for the
  * swept test, since its previous-frame position is not tracked here. */
+void AutoLoadLastSave(void);
+void AutoSaveProgress(void);
 void NetPauseTick(void);
 int  NetRaceFrozen(void);
 void NetPauseReset(void);
@@ -904,6 +906,7 @@ def SONICR_DC /* DC splash screen */
     g_surfaceStride = 640;
 
     LoadGameState();
+    AutoLoadLastSave();       /* progress from the save slot used last time */
 
     SetScreenDimensions();          /* 0x4CBEFC — sets g_dispCenterX/Y etc */
 
@@ -1033,6 +1036,9 @@ title_screen_entry:
     g_demoMode = DEMO_NONE;
 
 main_menu_init:
+    if (g_demoMode == DEMO_NONE) {
+        AutoSaveProgress();   /* progress from the last race -> last used save slot */
+    }
     g_netSessionActive = 0;
     ResetInputState();
     InitOptionStuff();
@@ -1297,6 +1303,9 @@ char_select:                                   /* 0x4ce66e */
     /* Race setup */
 
 race_setup:
+    if (g_demoMode == DEMO_NONE) {
+        AutoSaveProgress();   /* progress from the last race -> last used save slot */
+    }
     ApplyViewportGeometry();                       /* 0x4ce985: call 0x4cba28 */
     if (g_netSessionActive == 0) {
         LoadTrackSinglePlayer();

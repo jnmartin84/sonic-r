@@ -354,6 +354,10 @@ void SavePadTypesImpl(void)
  * Load sonicr.inf — reads 160 bytes into game options config block.
  * Returns 1 always.
  * ===================================================================== */
+/* Last Load/Save slot the player used, -1 if none: the progress is loaded
+ * from it at start-up and written back to it after every race. */
+int g_lastSaveSlot = -1;
+
 int LoadGameSettings(void)
 {
     FILE *fp = fOpen("SONICR.INF", "rb");
@@ -402,6 +406,9 @@ int LoadGameSettings(void)
         for (int i = 0; i < 8; i++) {
             g_optCfgRomData[i] = buf[24 + i];
         }
+        /* Port addition: last save slot used (slot + 1, 0 = none) in the
+         * spare tail of the block; old files have 0 there. */
+        g_lastSaveSlot = (buf[32] >= 1 && buf[32] <= 10) ? buf[32] - 1 : -1;
     }
     return 1;
 }
@@ -446,6 +453,7 @@ void SaveGameSettings(void)
     for (int i = 0; i < 8; i++) {
         buf[24 + i] = g_optCfgRomData[i];
     }
+    buf[32] = (g_lastSaveSlot >= 0) ? g_lastSaveSlot + 1 : 0;
 
     bswap32_arr(buf, 40);
     FILE *fp = fOpen("SONICR.INF", "wb");

@@ -2199,6 +2199,51 @@ const char *s_saveFilenames[10] = {  /* ROM at 0x502818 */
     "SAVE/R09.SAV", "SAVE/R10.SAV",
 };
 
+/* ---- Port addition: automatic save / load ---------------------------
+ * The original only saves when the player picks SAVE on the Load/Save
+ * screen. The slot last loaded or saved there is remembered (SONICR.INF);
+ * at start-up its progress is loaded, and after every race the progress is
+ * written back to it if it changed. */
+extern int g_lastSaveSlot;
+extern void SaveGameSettings(void);
+
+int SaveConfigSlot(int slot);
+
+static void SetLastSaveSlot(int slot)
+{
+    if (g_lastSaveSlot != slot) {
+        g_lastSaveSlot = slot;
+        SaveGameSettings();
+    }
+}
+
+void AutoLoadLastSave(void)
+{
+    if (g_lastSaveSlot < 0 || g_lastSaveSlot >= 10) return;
+    FILE *fp = fOpen(s_saveFilenames[g_lastSaveSlot], "rb");
+    if (fp == NULL) return;
+    int buf[554];
+    int ok = fRead(buf, 554 * 4, 1, fp) == 1;
+    fClose(fp);
+    if (!ok) return;
+    bswap32_arr(buf, 554);
+    memcpy(g_saveBlock, buf, sizeof(buf));
+    g_configPtrTable[g_lastSaveSlot] = g_configSlotStorage[g_lastSaveSlot];
+    memcpy(g_configPtrTable[g_lastSaveSlot], buf, sizeof(buf));
+    LoadAllGhostTimes();
+    DebugLog("Save: loaded slot %d automatically\n", g_lastSaveSlot + 1);
+}
+
+void AutoSaveProgress(void)
+{
+    if (g_lastSaveSlot < 0 || g_lastSaveSlot >= 10) return;
+    void *prev = g_configPtrTable[g_lastSaveSlot];
+    if (prev != NULL && memcmp(prev, g_saveBlock, 554 * 4) == 0) return;   /* unchanged */
+    if (SaveConfigSlot(g_lastSaveSlot)) {
+        DebugLog("Save: progress saved to slot %d\n", g_lastSaveSlot + 1);
+    }
+}
+
 /* LoadConfigSlot -- 0x0048F954 -- 48 bytes */
 /* Load config block from pointer table into g_saveBlock. */
 int LoadConfigSlot(int slot)
@@ -2748,10 +2793,12 @@ int LoadSaveScreen(void)
                     /* LOAD: copy slot data into g_saveBlock */
                     LoadConfigSlot(s_lsSlotIndex);             /* 0x48FD5D */
                     LoadAllGhostTimes();                     /* 0x48FD79 */
+                    SetLastSaveSlot(s_lsSlotIndex);
                 }
                 else if (s_lsColumn == 0) {
                     /* SAVE: save g_saveBlock to slot */
                     SaveConfigSlot(s_lsSlotIndex);           /* 0x48FD6D */
+                    SetLastSaveSlot(s_lsSlotIndex);
                 }
                 else {
                     /* NEW: reset to defaults */
