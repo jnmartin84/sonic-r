@@ -139,6 +139,7 @@ void xb_draw_fan(const float *verts, int n)
  * own path (RGBA -> RGBA needs no conversion there either).
  */
 #include "swizzle.h"
+#include <SDL.h>
 
 void xb_tex_image_rgba(int w, int h, const void *rgba)
 {
@@ -150,8 +151,15 @@ void xb_tex_image_rgba(int w, int h, const void *rgba)
         texture_t *cur = pbgl.tex[pbgl.active_tex_sv].tex;
         if (cur && cur->allocated) {
             static int s_syncs;
-            while (pb_busy())
-                ;
+            /* Bounded: a GPU that never goes idle used to freeze the game here
+             * for good. Give up after 2 s and say so in the log. */
+            unsigned t0 = SDL_GetTicks();
+            while (pb_busy()) {
+                if (SDL_GetTicks() - t0 > 2000) {
+                    fprintf(stderr, "texture re-upload: GPU still busy after 2 s, continuing\n");
+                    break;
+                }
+            }
             if (++s_syncs <= 10)
                 fprintf(stderr, "texture re-upload: GPU drained (#%d)\n", s_syncs);
         }
