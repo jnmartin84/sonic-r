@@ -24,7 +24,7 @@ If this use of AI is in conflict with your personal beliefs or values, please le
 
 - **▶ Windows, macOS & Linux** → **[docs/desktop.md](docs/desktop.md)**
 - **▶ Sega Dreamcast** → **[docs/dreamcast.md](docs/dreamcast.md)**
-- **▶ Original Xbox (experimental, tested on hardware by XadPT)** → **[docs/xbox.md](docs/xbox.md)**
+- **▶ Original Xbox (tested on real hardware by XadPT)** → **[docs/xbox.md](docs/xbox.md)**
 
 Each guide is self-contained: how to get or build it, the game data you supply,
 controls, network play, saves, and troubleshooting for that platform.

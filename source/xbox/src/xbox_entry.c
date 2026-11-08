@@ -370,6 +370,8 @@ static void xb_exit_cleanup(void)
     for (;;) { }
 }
 
+int g_xbDebug;   /* D:\\DEBUG.TXT present: log + debug combos */
+
 int main(void)
 {
     static char *argv[] = { "SONICR.XBE", 0 };
@@ -378,7 +380,11 @@ int main(void)
      * The buffer is flushed at natural pauses (slow/loading frames), by the
      * watchdog, the exception handler and on exit. If D: is read-only this is
      * silently skipped. */
-    if (freopen("D:\\SONICR.LOG", "w", stderr)) {
+    /* Diagnostics are off in normal use. Put an (empty) DEBUG.TXT next to
+     * default.xbe to get SONICR.LOG and the debug pad combos back. Without it
+     * stderr stays on pdclib's default invalid handle: writes are dropped. */
+    g_xbDebug = xb_exists("D:\\DEBUG.TXT");
+    if (g_xbDebug && freopen("D:\\SONICR.LOG", "w", stderr)) {
         setvbuf(stderr, NULL, _IOFBF, 64 * 1024);
         fprintf(stderr, "Sonic R Xbox: started, build %s %s\n", __DATE__, __TIME__);
     }

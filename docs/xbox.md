@@ -2,34 +2,168 @@
 
 *Back to the [README](../README.md).*
 
-> **Status: runs on real hardware** (tested by XadPT on an original Xbox).
-> Menus, races, audio, saves and the in-game reset work. Performance is good,
-> with a 30 fps cap even at the longest draw distance. Some visual bugs remain,
-> see [Known limitations](#known-limitations). Reports with `SONICR.LOG` are very
-> welcome.
+> **Status: complete, tested on real hardware.** Menus, races, split-screen,
+> music and sound, saves, online and LAN play, 480p and 720p all run on an
+> original Xbox. Behaviour and visuals were compared against the 1998 PC release
+> (`SONICR.EXE`) function by function.
 
 > **You supply your own game data.** This build is only the game engine. It
-> contains none of Sonic R's assets. You must own the 1998 PC release.
+> contains none of Sonic R's assets. You need your own copy of the 1998 PC
+> release (its CD has the data and the music).
 
-## What this is
+## Contents
 
-The desktop SDL2 sources in `source/sdl/src` are reused as they are, with a few
-`#ifdef SONICR_XBOX` blocks. The Xbox-specific pieces live in `source/xbox`:
+- [Install](#install)
+- [Music](#music)
+- [Playing](#playing)
+- [Online and LAN play](#online-and-lan-play)
+- [Video modes](#video-modes)
+- [Saves](#saves)
+- [Troubleshooting](#troubleshooting)
+- [Building from source](#building-from-source)
+- [Technical notes](#technical-notes)
+- [Credits](#credits)
 
-| Piece            | How it is done on Xbox                                                   |
-|------------------|--------------------------------------------------------------------------|
-| Toolchain        | [nxdk](https://github.com/XboxDev/nxdk) (clang + lld, SDL2 port)          |
-| Graphics         | [pbgl](https://github.com/Ryzee119/pbgl): OpenGL 1.x on the NV2A GPU      |
-| Textures         | RGBA8 upload (pbgl has no RGB565); 16-bit formats are a possible later saving |
-| Audio            | `src/xbox_mixer.c`, a minimal `SDL_mixer` subset on top of SDL audio      |
-| Input            | SDL GameController (standard mapping)                                    |
-| Game data path   | `D:\`, the folder `default.xbe` was launched from                         |
-| Network play     | **Not included** (`src/xbox_net_stub.c`). Single player / split-screen only |
+## Install
 
-## Build
+1. Copy these folders from the Sonic R PC CD (or an installed copy) into one
+   folder: `GENERAL`, `ISLAND`, `CITY`, `RUIN`, `FACTORY`, `EMERALD`, `AI`,
+   `BIN` and `SOUND`. Folder and file names should be UPPERCASE.
+2. Copy this repository's `DATA` folder contents over them (a few small files
+   that belong in `GENERAL`, `BIN` and `SOUND`, including
+   `BIN\OPTION\NET01.RAW`, the platform icons of the network screens).
+3. Add `default.xbe` and, optionally, the `MUSIC` folder (see [Music](#music)).
+4. Copy the folder to the Xbox hard drive, for example `E:\Games\Sonic R\`, and
+   launch `default.xbe` from your dashboard.
 
-You need nxdk and its prerequisites (clang, lld, cmake, make, flex, bison).
-Then clone pbgl into nxdk and build:
+```
+E:\Games\Sonic R\
+    default.xbe
+    AI\  BIN\  CITY\  EMERALD\  FACTORY\  GENERAL\  ISLAND\  RUIN\  SOUND\
+    MUSIC\track2.son ... (optional)
+```
+
+For xemu or a disc image, put the same files in `source/xbox/bin/` next to
+`default.xbe` and build an image with `extract-xiso -c source/xbox/bin
+"Sonic R.iso"`. Do not share images or packages that contain game data.
+
+## Music
+
+The PC game plays its soundtrack straight from the CD as audio tracks, which are
+not files. The Xbox build plays `MUSIC\trackN.son` files: headerless 44.1 kHz,
+16-bit stereo PCM, the same layout as CD audio, where `N` is the CD track number.
+(`.adx` and `.adp` files with the same names also work.) Without music the game
+runs normally, just without the soundtrack.
+
+**`SonicR-Music.exe`** (Windows, in the release package; source in
+`source/xbox/tools/sonicr_music/`) makes these files:
+
+- **From the original CD:** put the Sonic R CD in the PC and double-click
+  `SonicR-Music.exe`. It reads every audio track digitally (no quality loss) and
+  writes `MUSIC\track2.son`, `track3.son`, ... next to the program. To choose
+  the drive: `SonicR-Music.exe E:`.
+- **From WAV files you already ripped:** drag the WAV files, or the folder that
+  holds them, onto `SonicR-Music.exe`. Any PCM or float WAV works (8/16/24/32-bit,
+  mono or stereo, any sample rate); it is converted to 44.1 kHz 16-bit stereo.
+  The track number is taken from the file name (`track02.wav`,
+  `Sonic R - 05.wav`, `07 Living in the City.wav`...). MP3/OGG/FLAC rips: convert
+  them to WAV with any audio tool first.
+- `-o DIR` chooses the output folder.
+
+Copy the resulting `MUSIC` folder next to `default.xbe`. On Linux or macOS the
+same source builds with `cc -O2 -o sonicr_music sonicr_music.c` and converts WAV
+files (rip the CD with any ripper first).
+
+## Playing
+
+**Pad:** the default layout follows the PC game's pad support: A jump, B or X
+accelerate, Y camera, L/R triggers and White/Black drift, Start pause, Back
+cancel. **Options > Controls** remaps A, B, X, Y, Start, White, Black, the L/R
+triggers and the stick clicks (Back cancels the remap, the D-pad always steers).
+Up to four pads are supported for split-screen.
+
+**Options > Graphics:**
+
+- *Resolution:* 480P or 720P (the 4:3 picture stretched to fill a 16:9 screen).
+  Applied the next time the game starts; 720p must be enabled in the dashboard.
+- *Draw Distance:* Far is the PC maximum; Very Far reaches beyond it.
+
+**Exit to Dashboard** is an entry in the options menu. **In-game reset:** hold
+L + R triggers + Back + Black for half a second, anywhere.
+
+**Saves and progress** are written automatically: the last Load/Save slot you
+used is loaded at start-up, and progress is saved to it after every race.
+
+The 3D scene uses bilinear texture filtering, like the retail PC version on a 3D
+card; menus and the HUD stay sharp.
+
+## Online and LAN play
+
+The cross-platform online mode of this port works on the Xbox: Xbox and
+Windows/macOS/Linux players can race each other (use builds of the same
+version on every machine).
+
+- **Network:** connect the Ethernet cable; the dashboard's network settings
+  (DHCP or static) are used.
+- **Sign-in (online list):** the first time, the network screen shows a code
+  and a QR code: open the address on a phone or PC and sign in. The token is
+  saved with the settings. LAN play needs no sign-in.
+- **Buttons on the network screens:** A / Start host (or start the race), right
+  trigger join, Y LAN-only host / LAN search, left trigger change mode, D-pad
+  left/right character, D-pad up/down track, B back. The on-screen hints show
+  these Xbox buttons.
+- **Starting:** the host presses A; a 5-second "RACE STARTS IN N" countdown runs
+  on every machine. A machine that has not finished loading after 30 s is left
+  out instead of holding everyone on a black screen.
+- **Pause:** Start pauses the race for everyone ("GAME PAUSED BY <name>"); after
+  resuming, everyone gets a 3-2-1 countdown. A race paused for more than 120 s
+  ends for all. Online, "Restart" in the pause menu just resumes and "Quit"
+  leaves the session.
+- **Players leaving:** if someone quits or loses the connection mid-race, the
+  others keep racing ("<NAME> LEFT THE RACE"; that character disappears and is
+  ranked last). If the host leaves, each client finishes the race offline.
+- **After the race** everyone returns to the lobby on their own (the host
+  re-hosts, clients rejoin).
+- **Chat:** with a USB keyboard (through a controller-port USB adapter) the
+  lobby chat line appears: type, Enter sends, Backspace erases. Without a
+  keyboard the chat line is hidden.
+- Two consoles/PCs in the same house can join each other from the online list
+  (if the router cannot reach its own public address, the client falls back to
+  finding the host on the LAN).
+
+## Video modes
+
+The game draws in 640x480 (4:3). By default the Xbox runs at 640x480: 480p when
+the dashboard allows it (component/HD AV cable), 480i otherwise. 720p is chosen
+in Options > Graphics (see above). Before a choice is saved, a text file
+`VIDEO.TXT` next to `default.xbe` starting with `W` also selects 720p.
+
+## Saves
+
+Saves and settings go to `E:\UDATA\FFFF5352\` (shown in the dashboard's memory
+manager as *Sonic R*): race saves, settings (`SONICR.INF`, `JOYSTICK.INF`, the
+online token) and ghosts in separate folders. If that title ID is already used
+by a different program, the next free ID is used.
+
+## Troubleshooting
+
+- **No music:** check `MUSIC\trackN.son` next to `default.xbe` (lower or upper
+  case both work). Without the files the game is silent between sound effects.
+- **Debug log:** create an empty file `DEBUG.TXT` next to `default.xbe`. The game
+  then writes `SONICR.LOG` (start-up, video mode, network, timing, warnings) and
+  enables the developer pad combos. Remove `DEBUG.TXT` for normal play: logging
+  to the hard drive costs time.
+- **Black screen when an online race starts:** after 30 s the race starts
+  without the machine that is not ready. Check that everyone runs the same build.
+- Sometimes a console starts with the audio hardware stuck from the previous
+  program; the game detects that no audio is being mixed and restarts the audio
+  DMA by itself.
+
+## Building from source
+
+Requirements: [nxdk](https://github.com/XboxDev/nxdk) and its prerequisites
+(clang, lld, cmake, make, flex, bison), with
+[pbgl](https://github.com/Ryzee119/pbgl) cloned into `nxdk/lib/pbgl`.
 
 ```sh
 git clone --recursive https://github.com/XboxDev/nxdk.git
@@ -38,198 +172,60 @@ eval "$(nxdk/bin/activate -s)"
 make -C source/xbox NXDK_DIR=$PWD/nxdk -j8
 ```
 
-Outputs: `source/xbox/bin/default.xbe` and `source/xbox/Sonic R.iso`
-(engine only, no game data).
-
-## Game data
-
-Copy these folders from your PC copy of Sonic R: `GENERAL`, `ISLAND`, `CITY`,
-`RUIN`, `FACTORY`, `EMERALD`, `AI`, `BIN` and `SOUND`. The `DATA/` folder in this
-repo holds a few small files that belong in `GENERAL`, `BIN` and `SOUND`.
-
-**On the Xbox hard drive:** put `default.xbe` and the folders together, for
-example in `E:\Games\SonicR\`, and launch it from your dashboard.
-
-**In xemu or from a disc image:** put the folders inside `source/xbox/bin/`
-next to `default.xbe`, then rebuild the image:
+The default goal produces `source/xbox/bin/default.xbe` and stamps the title ID
+FFFF5352 into it (`tools/set_titleid.py`; cxbe always writes the generic
+FFFF0002, which would move the saves). The music tool for Windows:
 
 ```sh
-nxdk/tools/extract-xiso/build/extract-xiso -c source/xbox/bin "Sonic R.iso"
+i686-w64-mingw32-gcc -O2 -static -s -o SonicR-Music.exe source/xbox/tools/sonicr_music/sonicr_music.c
 ```
 
-Do not share images that contain game data.
+## Technical notes
 
-### Which copy of the game
+The desktop SDL2 sources in `source/sdl/src` are shared with the Windows, macOS,
+Linux and Dreamcast builds, with `#ifdef SONICR_XBOX` where the console differs.
+The Xbox pieces live in `source/xbox`:
 
-The engine was validated upstream against the **1998 PC release** (`SONICR.EXE`).
-The upstream docs do not list supported regions or reprints, so treat other
-versions as untested. Dreamcast or Saturn data will not work. Folder and file
-names should be UPPERCASE.
+| Piece     | On the Xbox |
+|-----------|-------------|
+| Toolchain | nxdk (clang + lld, pdclib, SDL2 port), whole build at `-O2` |
+| Graphics  | pbgl (OpenGL 1.x on the NV2A), plus `xbox_fastdraw.c`, which writes the triangle fans straight into the pbkit push buffer (one `pb_end` per batch) |
+| Display   | pbkit triple buffering with a guard against lost flips (the old black/blue flashes), scissor always on (pbgl never resets its window clip), full-framebuffer viewport with the 4:3 placement done in the projection |
+| Audio     | `xbox_mixer.c`: the SDL_mixer subset the game uses, sound effects resampled while mixing (kept mono 22 kHz to save memory), music streamed by a producer thread into a ring buffer; start-up audio watchdog |
+| Input     | SDL GameController; Black and the triggers remappable (extra bindings appended to `JOYSTICK.INF`); USB keyboards through libusbohci's HID driver (`xbox_kbd.c`) |
+| Files     | `D:\` = the launch folder; saves redirected to `E:\UDATA\FFFF5352` with dashboard metadata (`xbox_entry.c`) |
+| Network   | nxdk's lwIP behind small BSD socket shims (`source/xbox/include`), BearSSL without SSE2/AES-NI, seeded from cycle-counter jitter |
+| Exit      | the AC97 is idled and the console fully rebooted, so the dashboard never inherits running audio |
 
-### Music
-
-The PC game plays its music from CD audio tracks, which are not files. Put them
-in a `MUSIC` folder as `track2` ... `track21`. On Xbox only these formats work:
-`.son` (raw 44.1 kHz 16-bit stereo PCM), `.adx` and `.adp`. The `.ogg`, `.mp3`,
-`.flac` and `.wav` paths used by the desktop build need SDL_mixer decoders that
-the Xbox build does not have, so convert your rips to `.son` first. Without
-music the game still runs, just silent.
-
-### Log
-
-On startup the game writes errors to `SONICR.LOG` next to `default.xbe` (if the
-folder is writable). If it fails to start, send that file.
-
-### Saves
-
-Saves go to the hard drive in `E:\UDATA\FFFF5352`. cxbe always writes the
-generic title ID FFFF0002, so the default `make` goal stamps FFFF5352 into the
-XBE with `source/xbox/tools/set_titleid.py`. Without it the game would look
-for its saves in another folder.
-
-## Xbox-specific features
-
-- **Exit to Dashboard** is an entry in the options menu.
-- **In-game reset (IGR):** hold left trigger + right trigger + Back + Black for
-  about half a second, in any menu or race, to return to the dashboard.
-- **Controls** page is gamepad only, with Xbox pad mapping. Back cancels a
-  remap. White + Back cycles the debug render mode; Back + Y writes a
-  `FLASHMARK` line to the log (useful to mark the moment of a visual glitch).
-- **Graphics** page has a Draw Distance setting. Far is the PC maximum and Very
-  Far goes beyond it.
-- The whole build, including nxdk's libraries, is compiled with `-O2`, with a
-  fast `memcpy`/`memset` and a faster texture upload.
-- `SONICR.LOG` starts with the build time of the XBE, so you can tell which
-  build produced it.
-- **Water** uses the faithful retail Direct3D renderer (the mirrored sky and
-  sun panorama rippled by multi-octave noise), as in the PC version. The
-  desktop build defaults to a prototype that imitates the old software mode
-  (`WATER_RIPPLE_SW` in `render_track_d3d.c`).
-- **Bilinear texture filtering** is on by default for the 3D race scene, like
-  the retail PC version running on a 3D card (this decompilation point-samples);
-  menus, logos and the HUD stay point-sampled so sprite edges stay clean.
-  Back + R3 (click the right stick) toggles it. Colour-keyed texels are stored as transparent black
-  so filtering does not leave a green fringe.
-- **Character select:** locked slots (Eggman included) show the red X with the
-  dark outline over the portrait, as the retail PC version does (the colour-keyed
-  X in `SCHAR00.RAW`), instead of the additive X variants.
-
-## Online and LAN play (experimental)
-
-The desktop port's network play is built in: sign-in and the session list go
-through the Reality Jump matchmaker over HTTPS (BearSSL), and races run over
-UDP directly between the consoles/PCs, with UPnP to open the host's port.
-
-- **Network:** plug in the Ethernet cable. The console uses the dashboard's
-  network settings (DHCP or a static address). The connection comes up in the
-  background at boot; `SONICR.LOG` shows `net: up, IP ...` or `net: no network`.
-- **Extra file:** copy `DATA/BIN/OPTION/NET01.RAW` from this repository into
-  the game's `BIN\OPTION\` folder (network-screen platform icons, not part of
-  the original PC data).
-- **Sign-in:** the first time, the network screen shows a code and a QR code;
-  open the address on a phone or PC and sign in. The token is saved in
-  `E:\UDATA\<TitleID>\` with the settings, so later launches skip this step.
-- **Lobby buttons:** A / Start host or start the race, right trigger join, Y
-  LAN-only, left trigger change mode, D-pad left/right character, D-pad up/down
-  track, B back. The on-screen hints show these Xbox buttons: the PC key names
-  painted into `NET00.RAW` are replaced when the file is loaded (a patched copy
-  is written to UDATA; `source/xbox/tools/make_net00_patch.py` builds the
-  patch), and the text prompts ("PRESS A TO HOST", "PRESS RT TO JOIN", the
-  session list hint) name the pad buttons too. In the online session list,
-  D-pad up/down selects and A or Start joins; Y there searches the local
-  network instead. On the host/join screen, Y hosts a LAN-only game (not listed
-  on the matchmaker); an online host (A) can also be joined over the LAN.
-  After a race both players return to the lobby on their own: the host re-hosts
-  and the client rejoins the same address. A client that gets no answer resends
-  its join request every second and, after 3 s, looks for the host on the local
-  network (routers often can't reach their own public address from inside), so
-  two machines in the same house can join each other from the online list.
-  Pausing an online race pauses it for everyone ("GAME PAUSED BY <name>");
-  on resume all players get a 3-2-1 countdown, and a race left paused for
-  120 s ends and everyone returns to the host/join screen. Players on
-  different machines collide with each other like offline opponents.
-  When the host starts, a 5 s "RACE STARTS IN N" countdown runs on every
-  machine first. Loading has a 30 s limit: a player who does not finish
-  loading is left out of the race instead of keeping the others on a black
-  screen.
-  If a player quits or loses the connection mid-race (clean exit, or 5 s of
-  silence), the others keep racing: that character disappears, drops to last
-  place and "<NAME> LEFT THE RACE" is shown. If the host goes, each client
-  finishes the race offline and then returns to the host/join screen.
-  The lobby chat works with a USB keyboard (boot-protocol HID, through a
-  controller-port USB adapter; read by `src/xbox_kbd.c`): type, Enter sends,
-  Backspace erases. Without a keyboard the chat line and its cursor are
-  hidden. The host needs at least
-  one other player to start a race.
-- The console registers as platform `xbox`.
-
-Under the hood: nxdk's lwIP provides the BSD socket API through small shim
-headers in `source/xbox/include/` (`sys/socket.h`, `netdb.h`, ...).
-`SO_RCVTIMEO`, which nxdk's lwIP leaves out, is emulated with `select()`.
-BearSSL is built without the SSE2/AES-NI/PCLMUL/RDRAND paths (the Pentium III
-has none of them) and is seeded from CPU-cycle-counter timing jitter, since the
-Xbox has no OS random source.
-
-## Video mode
-
-The game renders at 640x480 (4:3) game coordinates. By default the Xbox build
-runs at **640x480**: 480p if the dashboard has 480p enabled (HD AV pack /
-component cable), 480i if not.
-
-The mode is chosen in **Options > Graphics > Resolution**: 480P or 720P
-(the 4:3 image stretched to fill a 16:9 screen; the pillarboxed 720p variant
-was dropped from the menu). It is
-saved with the settings and takes effect the next time the game starts; 720p
-also needs to be enabled in the dashboard. Without a choice there, 720p can
-still be forced the old way: create a text file `VIDEO.TXT` next to `default.xbe`
-whose first character is
-
-- `7` - 1280x720 with the 4:3 image pillarboxed (black side bars), or
-- `W` - 1280x720 with the image stretched to fill the 16:9 screen.
-
-Both need 720p enabled in the dashboard; otherwise the game stays at 640x480.
-`SONICR.LOG` prints the dashboard flags and the mode in use ("video: ...").
-
-(The first 720p test came out cropped on the right: pbgl clamps its window clip
-to `[0, viewport width)` rather than `[viewport x, x + width)`, so a pillarboxed
-viewport starting at x=160 lost its last 160 pixels. The Xbox build now keeps
-the GL viewport at the full framebuffer and places the 4:3 image through the
-projection instead.)
-
-## Known limitations
-
-- Memory is the main constraint (64 MB total). Sound effects are kept in their
-  original mono 22.05 kHz format (about 8 MB) and resampled while mixing;
-  converting them to 44.1 kHz stereo used 32 MB and left no room for textures.
-  `SONICR.LOG` shows the free memory at several points.
-- Rendering relies on pbgl's fixed-function path; any texture or blend mode it
-  does not implement will look wrong rather than crash.
-- Small seams can show at the joins of the background strips; the retail PC
-  version has them too.
-- Fixed: the black/blue flashes (a dark rectangle, mostly over the lower half of
-  the picture, every few seconds, even while paused). pbkit's triple buffering
-  can lose a flip when the frame-ready interrupt and a VBlank are serviced in
-  the same DPC pass: the VBlank handler marks the buffer as shown although the
-  display was never pointed at it, and the next frame then clears the buffer
-  that is still on screen. The port now checks the display address while the
-  next frame is drawn and repairs a lost flip right away; as a fallback, before
-  drawing into a back buffer it waits for (or forces) the pending flip if that
-  buffer is still on screen. The log counts the repairs ("lost flips fixed").
-- Fixed: the streaky, stretched floor seen on Factory. The playfield grid (and
-  water reflection) no longer write depth, so they cannot z-fight with the
-  track surface.
-- Fixed: after a 2-player (split-screen) race the whole screen stayed cropped to
-  the right half, even in menus. pbgl only writes the GPU window clip while the
-  scissor test is on and never resets it when it is turned off, so the Xbox
-  backend now keeps the scissor test always on and treats "disabled" as a
-  full-screen rectangle.
+Fidelity work against the 1998 EXE (all shared with the other platforms): the
+water reflection, sky panorama, weather (rain, snow, splashes, lightning),
+character jet/glow animation, particles, track IDs (the EXE numbers Factory 3
+and Ruin 4; the decompilation swaps both consistently), fog and the 2-player
+water scale were checked or corrected instruction by instruction. Small seams at
+some geometry joins are part of the original game.
 
 ## Credits
 
-- **jnmartin84**: the Sonic R decompilation and the cross-platform engine this
-  port is built on.
-- **XadPT**: the Xbox port. Hardware testing and bug reports on a real console,
-  feature requests and direction.
-- **[nxdk](https://github.com/XboxDev/nxdk)** (XboxDev) and its **pbgl**
-  OpenGL layer: the toolchain and graphics backend.
-- Code written with Claude Code (Anthropic), working from XadPT's test results.
+- **Original game:** *Sonic R* (1997/1998) by **Traveller's Tales** and
+  **Sonic Team**, published by **SEGA**. Sonic R and all related names are
+  trademarks of SEGA. This project contains no game assets.
+- **[jnmartin84](https://github.com/jnmartin84)**: the Sonic R decompilation and
+  cross-platform engine (desktop, Dreamcast, online mode) this port is built on.
+- **Xbox port:** all code of the Xbox port was written by **Claude** (Anthropic's
+  AI model, through Claude Code).
+- **XadPT:** did not write any code. XadPT gave Claude all the instructions and
+  direction for the port, and tested everything that could be tested on a real
+  original Xbox (and on Windows), reporting each problem until the port was
+  faithful to the original and working.
+- **[nxdk](https://github.com/XboxDev/nxdk)** and the **XboxDev** community:
+  toolchain, kernel headers, pbkit, pdclib, the SDL2 port, lwIP integration,
+  libusbohci and cxbe/extract-xiso.
+- **[pbgl](https://github.com/Ryzee119/pbgl)** by **Ryzee119**: OpenGL on pbkit;
+  Ryzee119 also maintains the Xbox USB stack used for pads and keyboards.
+- **[SDL2](https://www.libsdl.org/)** (Sam Lantinga and contributors), **lwIP**
+  (Adam Dunkels and contributors), **[BearSSL](https://bearssl.org/)** (Thomas
+  Pornin), **libusbohci** (Nuvoton), **QR Code generator** (Project Nayuki).
+- **Reality Jump matchmaker** (`sonicr.online`): the online session list and
+  sign-in used by this port's online mode.
+- Windows test builds: **[llvm-mingw](https://github.com/mstorsjo/llvm-mingw)**
+  (Martin Storsjö), **SDL2_mixer**, **GLEW**, **miniupnpc** (Thomas Bernard).

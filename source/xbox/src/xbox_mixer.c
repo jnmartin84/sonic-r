@@ -12,6 +12,8 @@
 #include "SDL_mixer.h"
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <hal/audio.h>
 #include <string.h>
 
 #define MAX_CHANNELS 32
@@ -221,9 +223,13 @@ static void mix_music(Uint8 *out, int len)
     }
 }
 
+static volatile Uint32 s_cbCount;     /* audio callbacks since the device opened */
+static Uint32          s_openMs;
+
 static void SDLCALL audio_cb(void *ud, Uint8 *stream, int len)
 {
     (void)ud;
+    s_cbCount++;
     SDL_memset(stream, 0, (size_t)len);
     if (s_musicPlaying && s_music && !xb_musicPaused) {
         mix_music(stream, len);
@@ -268,8 +274,36 @@ int Mix_OpenAudio(int frequency, Uint16 format, int channels, int chunksize)
         s_musQuit = 0;
         s_musThread = SDL_CreateThread(music_producer, "music", NULL);
     }
+    s_cbCount = 0;
+    s_openMs = SDL_GetTicks();
     SDL_PauseAudioDevice(s_dev, 0);
     return 0;
+}
+
+/* Called once per frame. Now and then the game used to start silent: the
+ * AC97 DMA never ran, so SDL's audio thread was never woken to mix. If no
+ * mixing has happened 1.5 s after the device opened, restart the DMA (the
+ * same "run" write XAudioPlay does at open) and check again; this repeats a
+ * few times, then gives up quietly. */
+void xb_audio_watch(void)
+{
+    static int s_kicks;
+    if (!s_dev || s_kicks >= 4) {
+        return;
+    }
+    Uint32 now = SDL_GetTicks();
+    if (now - s_openMs < 1500) {
+        return;
+    }
+    if (s_cbCount >= 4) {
+        s_kicks = 4;                       /* audio is running: stop watching */
+        return;
+    }
+    s_kicks++;
+    fprintf(stderr, "audio: no mixing %u ms after open (callbacks %u) - restarting DMA (#%d)\n",
+            (unsigned)(now - s_openMs), (unsigned)s_cbCount, s_kicks);
+    XAudioPlay();
+    s_openMs = now;
 }
 
 void Mix_CloseAudio(void)

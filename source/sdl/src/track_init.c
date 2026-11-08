@@ -803,9 +803,9 @@ void InitFarClipAndFog(int farClip)
     }
 
     /* Set the 3 fog distance globals used by DrawCharacterSpritesSoft */
-    g_fogDist0 = s_fogDistTable[0];
-    g_fogDist1 = s_fogDistTable[5];
-    g_fogDist2 = s_fogDistTable[10];
+    g_fogDist0 = s_fogDistTable[2];   /* 0x6D7624 = table base 0x6D761C + 2*4 */
+    g_fogDist1 = s_fogDistTable[4];   /* 0x6D762C */
+    g_fogDist2 = s_fogDistTable[6];   /* 0x6D7634 */
 }
 
 /**

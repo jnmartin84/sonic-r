@@ -453,11 +453,11 @@ int platform_init(int width, int height, int fullscreen, const char *title)
     (void)fullscreen;
     (void)title;
     {
-        /* Default 640x480 (480p/480i per the dashboard). 720p is opt-in until
-         * it is verified on more TVs: D:\VIDEO.TXT starting with
-         *   '7' -> 1280x720, 4:3 image pillarboxed (black side bars)
-         *   'W' -> 1280x720, image stretched to fill the 16:9 screen
-         * (both only if the dashboard has 720p enabled). */
+        /* Default 640x480 (480p/480i per the dashboard). 720p (the 4:3 image
+         * stretched to fill 16:9) is chosen in Options > Graphics > Resolution,
+         * or, before a choice is saved, with a D:\VIDEO.TXT starting with 'W'
+         * (or '7', the old pillarbox setting, which had display bugs). Both
+         * need 720p enabled in the dashboard. */
         DWORD enc = XVideoGetEncoderSettings();
         int want720 = 0;
         extern int g_xbVideoMode;   /* Options > Graphics > Resolution (save.c) */
@@ -470,8 +470,7 @@ int platform_init(int width, int height, int fullscreen, const char *title)
             FILE *cfg = fopen("D:\\VIDEO.TXT", "r");
             if (cfg) {
                 int c = fgetc(cfg);
-                if (c == '7') want720 = 1;
-                if (c == 'W' || c == 'w') { want720 = 1; g_xbStretch = 1; }
+                if (c == '7' || c == 'W' || c == 'w') { want720 = 1; g_xbStretch = 1; }
                 fclose(cfg);
             }
         }
@@ -515,7 +514,7 @@ int platform_init(int width, int height, int fullscreen, const char *title)
     }
     {
         extern void xbox_start_watchdog(void);
-        xbox_start_watchdog();
+        { extern int g_xbDebug; if (g_xbDebug) xbox_start_watchdog(); }
     }
     return 0;
 #endif
@@ -1077,6 +1076,7 @@ void platform_gl_swap(void)
 {
 #ifdef SONICR_XBOX
     { extern void xb_batch_end(void); xb_batch_end(); }
+    { extern void xb_audio_watch(void); xb_audio_watch(); }
     {
         static int s_frames;
         s_frames++;
@@ -1106,6 +1106,8 @@ void platform_gl_swap(void)
                 exit(0);   /* atexit handler idles the audio and does the full reboot */
             }
         }
+        extern int g_xbDebug;
+        if (g_xbDebug) {   /* debug-only pad combos (DEBUG.TXT) */
         {
             /* Back button cycles debug render modes (0 = normal). */
             extern int g_dbgMode;
@@ -1172,6 +1174,7 @@ void platform_gl_swap(void)
             }
             s_muPrev = mu;
         }
+        }   /* g_xbDebug */
         {
             /* Log frames that took unusually long (stutter hunting). */
             static unsigned s_lastTick;
