@@ -143,10 +143,13 @@ static void GL_ApplyTpageFilter(int tp)
         extern int g_xbBilinear, g_xb3D, g_xbLinearNow;
         extern int g_tpageCount;   /* the sky/parallax atlas tpage */
         /* The parallax/sky tpage is a folded atlas (strips side by side in
-         * one texture): bilinear blends the neighbouring strip in at every
-         * strip join, which drew thin vertical lines across the sky and its
-         * water reflection. Keep it point-sampled, as the renderer asks. */
-        if (g_xbBilinear && g_xb3D && tp != g_tpageCount) want = (unsigned char)(R_FILTER_LINEAR + 1);
+         * one texture): bilinear used to blend the neighbouring strip in at
+         * every strip join (thin vertical lines across the sky and its water
+         * reflection). xb_draw_fan now insets each polygon's UVs by half a
+         * texel, which stops that, so the sky and the water band can stay
+         * smooth like the retail PC version. */
+        (void)g_tpageCount;
+        if (g_xbBilinear && g_xb3D) want = (unsigned char)(R_FILTER_LINEAR + 1);
         g_xbLinearNow = (want == (unsigned char)(R_FILTER_LINEAR + 1));
     }
 #endif
