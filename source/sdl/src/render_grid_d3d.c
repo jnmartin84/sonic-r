@@ -63,6 +63,12 @@ extern float g_farClipFullScreenF;  /* hud_full.c — far plane BEFORE the
  * pre/post-bias mismatch isn't visible. */
 #define GRID_DEPTH_BIAS     12.0f
 //0.5f
+#elif defined(SONICR_XBOX)
+/* Xbox: the grid writes depth again (so it hides the parts of islands and
+ * rocks that sit under the water, as on the PC), and a bigger push keeps it
+ * from z-fighting with the track surface laid on top of it (the streaky
+ * floor that turning its depth writes off used to hide). */
+#define GRID_DEPTH_BIAS     256.0f
 #else
 #define GRID_DEPTH_BIAS     64.0f                /* 0x52C4E4: depth bias added before Z-buffer calc (float) */
 #endif
