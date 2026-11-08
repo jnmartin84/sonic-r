@@ -779,7 +779,13 @@ static void AnimateCharacterGlow(Player *player, int *glowState, int modelIdx,
         brightness = 0;
     }
 
-    if (g_ghostDataExists == 0) {
+    /* Binary 0x421984: cmp [0x90207C],0 — that is g_raceOrder[3], the
+     * per-frame 0..2 cycle counter (race_timing.c g_sfxCycleCounter), not
+     * g_ghostDataExists (0x8FB960). Halving on one frame in three is what
+     * makes the jet/glow flicker; reading the wrong flag halved it on every
+     * frame in normal races, leaving a dim, static flame. */
+    extern int g_raceOrder[];
+    if (g_raceOrder[3] == 0) {
         /* abs(brightness) / 2 */
         int sign = brightness >> 31;
         brightness = ((brightness ^ sign) - sign) >> 1;
