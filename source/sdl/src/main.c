@@ -219,9 +219,16 @@ void InitJoystick(void) {
  * NetworkScreen calls these; they return success so the state machine
  * can proceed through its lobby flow. */
 /* 0x486D78 — Host: bind UDP socket and begin accepting clients */
+/* Host: accept JOIN_REQ only while in a lobby. A client returning to the
+ * lobby after a race keeps asking to join; if the host is still on its podium
+ * / results screens, accepting would give it a slot in the old session, which
+ * the host then closes when it re-hosts, leaving the client stranded. */
+int g_netAcceptJoins = 1;
+
 int CreateNetworkSession(const char *name, const char *password)
 {
     (void)name; (void)password;
+    g_netAcceptJoins = 1;
     if (net_host_start(NET_PORT_DEFAULT) == 0) {
         g_currentPlayerIdx = 0;          /* host is slot 0 */
         g_localPlayerIndex = 0;
@@ -1397,6 +1404,9 @@ race_start:
     g_raceStateCounter0 = 0;
     g_raceStateCounter1 = 0;
     DebugLog("MAIN GAME LOOP\n");
+    if (g_isNetworkGame || g_netSessionActive) {
+        g_netAcceptJoins = 0;
+    }
 #ifdef SONICR_XBOX
     { extern void xbox_log_mem(const char *where); xbox_log_mem("race start"); }
 #endif

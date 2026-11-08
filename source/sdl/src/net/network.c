@@ -879,7 +879,11 @@ void SendNetworkHostData(void)
         }
     }
 
-    if (g_netDisconnectFlag == 0) {
+    /* After the finish (podium camera) the others leave as soon as their own
+     * podium ends; that is the normal way back to the lobby, not a drop-out.
+     * Let our podium and results run, so we reach NetworkScreenReentry and
+     * re-host instead of landing on the host/join prompt. */
+    if (g_netDisconnectFlag == 0 && g_postRaceCameraMode == 0) {
         int anyRemote = 0;
         for (i = 0; i < g_netPlayerCount; i++) {
             if (i == g_localPlayerIndex) continue;
@@ -1535,6 +1539,16 @@ void ApplyNetworkPlayerState(void)
 
         /* ---- SDL session protocol: join request / slot assignment ---- */
         if (header == NET_MSG_JOIN_REQ && net_is_host()) {
+            extern int g_netAcceptJoins;
+            if (!g_netAcceptJoins) {
+                /* Not in the lobby (race / podium / results): drop it, the
+                 * client retries every second until we are back. */
+                if (from_slot >= 1 && from_slot < NET_MAX_PLAYERS
+                    && !g_playerBase[from_slot].netActive) {
+                    net_unregister_slot(from_slot);
+                }
+                continue;
+            }
             /* Host: client requested a slot. from_slot was auto-assigned
              * by net_recv(). Payload carries the client's matchmaker
              * username; we use it to populate the decoration table.
@@ -1989,7 +2003,7 @@ void ApplyNetworkPlayerState(void)
     }
 
     if (!net_is_host() && net_is_active() && s_lastHostPacketMs != 0
-        && g_introCountdown == 0) {
+        && g_introCountdown == 0 && g_postRaceCameraMode == 0) {
         DWORD now    = timeGetTime();
         DWORD silent = now - s_lastHostPacketMs;
         if (silent > 5000 && g_netDisconnectFlag == 0) {
