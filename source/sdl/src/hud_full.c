@@ -1845,6 +1845,7 @@ void DrawMinimapWidget(char *vpPlayer)  /* EAX = current viewport's player point
 
     for (; playerIndex >= 0; playerIndex--) {
         Player *playerPtr = &pBase[playerIndex];
+        { extern int NetPlayerGone(int); if (NetPlayerGone(playerIndex)) continue; }   /* left the online race */
 
         /* Ghost dot blink: in Time Attack the ghost's dot is hidden on odd
          * frames, not hidden outright. 0x4D288C tests [0x902078] =

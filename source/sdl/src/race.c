@@ -102,6 +102,9 @@ void ComputeRacePositions(int playerIdx)
         progress = 0;
     }
 
+    /* A player who left the online race drops to the bottom of the ranking. */
+    { extern int NetPlayerGone(int); if (NetPlayerGone(playerSlot)) progress = 0; }
+
     /* 0x4813DC: high-water mark for wrong-way detection */
     if (progress > (unsigned int)player->progressHighWater) {
         player->progressHighWater = (int)progress;

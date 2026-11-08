@@ -192,6 +192,7 @@ void RenderNetworkPlayers(void)
         }
 
         Player *player = &g_playerBase[i];
+        { extern int NetPlayerGone(int); if (NetPlayerGone(i)) continue; }   /* left the online race */
 
         /* 0x465540: world position relative to camera */
         int dx = (player->posX - g_camOrientX) >> 12;              /* 0x465549 */

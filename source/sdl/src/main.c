@@ -1392,6 +1392,7 @@ race_setup:
     g_netFrameCounter = 0;
     g_netDisconnectFlag = 0;
     NetPauseReset();
+    { extern void NetRaceResetPlayers(void); NetRaceResetPlayers(); }
     g_netSyncEstablished = 0;
     g_netPlayerAlive[0] = 0;
     g_netPlayerAlive[1] = 0;
@@ -1799,7 +1800,7 @@ race_start:
             SpawnPlayerParticleEffects(PLAYER_PTR(0), 1);
             for (int i = 1; i < (int)g_numPlayers; i++) {
                 RACE_MARK("SpawnPlayerParticleEffects");
-                SpawnPlayerParticleEffects(PLAYER_PTR(i), 0);
+                { extern int NetPlayerGone(int); if (!NetPlayerGone(i)) SpawnPlayerParticleEffects(PLAYER_PTR(i), 0); }
             }
             if (g_postRaceCameraMode == 0) {
                 RACE_MARK("SpawnFootShadows");

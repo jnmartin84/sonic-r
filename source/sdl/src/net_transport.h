@@ -35,6 +35,8 @@
 #define NET_MSG_LEVEL_READY 0xFFF00070   /* any → host: finished loading, ready for race */
 #define NET_MSG_LEVEL_GO    0xFFF00080   /* host → all: all peers loaded, enter countdown */
 #define NET_MSG_PAUSE       0xFFF00090   /* any → all (host relays): race paused (1) / resumed (0) by slot */
+#define NET_MSG_ACTIVE_MASK 0xFFF000A0   /* host → clients (10 Hz in race): bit i set = slot i still racing */
+#define NET_MSG_HOST_LEFT   0xFFF000B0   /* host → clients: host is closing the session */
 
 /* Snapshot networking (in-race, replaces lockstep) */
 #define NET_MSG_SNAPSHOT      0xFFF0005F   /* host → clients: world snapshot (10 Hz) */

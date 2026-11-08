@@ -165,6 +165,7 @@ void SpawnFootShadows(void)
 
     for (int i = 0; i < (int)g_numPlayers; i++) {
         Player *p = &g_playerBase[i];
+        { extern int NetPlayerGone(int); if (NetPlayerGone(i)) continue; }   /* left the online race */
         /* Binary: 0x4832A7-C4 — stop at the ghost slot in plain Time Attack.
          * cmp ecx,1; cmp ecx,[0x8fd448](g_ghostToggle); cmp eax,2; cmp eax,[0x8fb954]; jg end
          * [0x8fb954] is g_raceSubMode, not a human count — Tag/Balloon run under

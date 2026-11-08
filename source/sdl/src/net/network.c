@@ -856,6 +856,100 @@ static int net_poll_one(char *buf, int maxlen, int *from_slot)
         : net_recv(buf, maxlen, from_slot);
 }
 
+/* ---- Players leaving during an online race ---------------------------------
+ * A player who quits, crashes or loses the connection is taken out of the race
+ * on every machine: their character disappears (no model, shadow, name tag,
+ * minimap dot or collision), they drop to the bottom of the ranking, and a
+ * "<NAME> LEFT THE RACE" notice is shown. The race goes on for the others.
+ *  - host: a client is dropped on NET_MSG_LEAVE or after 5 s of silence; the
+ *    host then tells the clients with NET_MSG_ACTIVE_MASK (10 Hz);
+ *  - client: if the host goes (NET_MSG_HOST_LEFT, or 5 s of silence) nobody can
+ *    relay the others any more, so the client finishes the race on its own and
+ *    returns to the host/join screen afterwards. */
+extern int g_netAcceptJoins;
+static unsigned s_goneMask;           /* slots that left this race */
+static char     s_noticeText[48];
+static char     s_noticeText2[48];
+static DWORD    s_noticeUntil;
+static void np_player_gone(int slot);  /* online pause: forget a pauser that left */
+
+static void net_notice(const char *l1, const char *l2)
+{
+    snprintf(s_noticeText, sizeof(s_noticeText), "%s", l1 ? l1 : "");
+    snprintf(s_noticeText2, sizeof(s_noticeText2), "%s", l2 ? l2 : "");
+    for (char *c = s_noticeText; *c; c++) if (*c >= 'a' && *c <= 'z') *c -= 32;
+    s_noticeUntil = timeGetTime() + 5000;
+    if (s_noticeUntil == 0) s_noticeUntil = 1;
+}
+
+/* 1 if slot left the current online race (it must not be drawn or collided). */
+int NetPlayerGone(int slot)
+{
+    if (slot < 0 || slot >= NET_MAX_PLAYERS) return 0;
+    if (g_netSessionActive == 0 && g_isNetworkGame == 0) return 0;
+    if (slot == g_localPlayerIndex) return 0;
+    return (s_goneMask >> slot) & 1;
+}
+
+/* Called at the start of every race. */
+void NetRaceResetPlayers(void)
+{
+    s_goneMask = 0;
+    s_noticeUntil = 0;
+}
+
+/* Take slot out of the race on this machine. */
+void NetPlayerLeft(int slot, int quiet)
+{
+    if (slot < 0 || slot >= NET_MAX_PLAYERS || slot == g_localPlayerIndex) return;
+    if ((s_goneMask >> slot) & 1) return;
+    s_goneMask |= 1u << slot;
+    g_playerBase[slot].netActive = 0;
+    g_playerBase[slot].netConnected = 0;
+    np_player_gone(slot);
+    DebugLog("Net: slot %d ('%s') left the race\n", slot, net_get_slot_name(slot));
+    if (!quiet) {
+        char line[48];
+        const char *n = net_get_slot_name(slot);
+        snprintf(line, sizeof(line), "%.20s LEFT THE RACE", (n && n[0]) ? n : "A PLAYER");
+        net_notice(line, NULL);
+    }
+}
+
+/* Host: a client left (LEAVE or silence) during the race. The slot's name is
+ * kept until the race is over (results, notice); re-hosting starts fresh. */
+static void host_drop_racer(int slot)
+{
+    s_hostSlotLastRecvMs[slot] = 0;
+    net_unregister_slot(slot);
+    NetPlayerLeft(slot, 0);
+}
+
+/* Host: tell the clients who is still in the race. */
+static void host_send_active_mask(void)
+{
+    char b[8];
+    unsigned mask = 0;
+    for (int i = 0; i < g_netPlayerCount && i < NET_MAX_PLAYERS; i++) {
+        if (!((s_goneMask >> i) & 1)) mask |= 1u << i;
+    }
+    wl32(b + 0, (uint32_t)NET_MSG_ACTIVE_MASK);
+    wl32(b + 4, (uint32_t)mask);
+    net_broadcast(b, 8);
+}
+
+/* Client: the host is gone. Finish the race alone, leave the session now so
+ * the post-race flow goes back to the host/join screen. */
+static void client_lost_host(const char *why)
+{
+    DebugLog("Net: %s - finishing the race offline\n", why);
+    for (int i = 0; i < NET_MAX_PLAYERS; i++) {
+        if (i != g_localPlayerIndex && i < (int)g_numPlayers) NetPlayerLeft(i, 1);
+    }
+    net_notice(why, "THE RACE CONTINUES OFFLINE");
+    CloseDirectPlaySession();
+}
+
 void SendNetworkHostData(void)
 {
     int i;
@@ -871,34 +965,15 @@ void SendNetworkHostData(void)
         DWORD silent = now - s_hostSlotLastRecvMs[i];
         if (silent > 5000) {
             DebugLog("Player %d disconnected (silent %ums)\n", i, (unsigned)silent);
-            g_playerBase[i].netConnected = 0;
-            g_playerBase[i].netActive = 0;
-            s_hostSlotLastRecvMs[i] = 0;
-            net_unregister_slot(i);
+            host_drop_racer(i);
         } else if (silent > 2000) {
             s_netInputBuffer[i] = 0;
         }
     }
 
-    /* After the finish (podium camera) the others leave as soon as their own
-     * podium ends; that is the normal way back to the lobby, not a drop-out.
-     * Let our podium and results run, so we reach NetworkScreenReentry and
-     * re-host instead of landing on the host/join prompt. */
-    if (g_netDisconnectFlag == 0 && g_postRaceCameraMode == 0) {
-        int anyRemote = 0;
-        for (i = 0; i < g_netPlayerCount; i++) {
-            if (i == g_localPlayerIndex) continue;
-            if (g_playerBase[i].netActive) { anyRemote = 1; break; }
-        }
-        if (!anyRemote) {
-            DebugLog("All remote players disconnected — exiting race\n");
-            g_netDisconnectFlag = 1;
-            if (g_fadeState != FADE_OUT) {
-                g_fadeState = FADE_OUT;
-                g_fadeSpeed = 0xC;
-            }
-        }
-    }
+    /* A player who drops out is removed from the race (NetPlayerLeft) and the
+     * others keep racing; with nobody left the host finishes the race alone and
+     * goes back to its lobby afterwards. */
 
     g_netSyncEstablished = 1;
 }
@@ -1034,6 +1109,12 @@ void CloseDirectPlaySession(void)
         /* Wire: 4 bytes, int header = NET_MSG_LEAVE */
         char _lbuf[4]; wl32(_lbuf, (uint32_t)NET_MSG_LEAVE);
         net_send_to_host(_lbuf, 4);
+    }
+    /* Host closing: tell the clients right away (a few times, it is UDP) so
+     * they do not wait 5 s for the silence timeout. */
+    if (net_is_active() && net_is_host()) {
+        char _hbuf[4]; wl32(_hbuf, (uint32_t)NET_MSG_HOST_LEFT);
+        for (int _k = 0; _k < 3; _k++) net_broadcast(_hbuf, 4);
     }
     s_haveSlotAssign = 0;
     memset(s_hostSlotLastRecvMs, 0, sizeof(s_hostSlotLastRecvMs));
@@ -1210,6 +1291,7 @@ void ProcessNetworkGameData(void)
         int snapLen = net_build_snapshot(snapBuf, sizeof(snapBuf));
         if (snapLen > 0)
             UpdateNetworkSync(snapBuf, snapLen);
+        host_send_active_mask();
     }
 
     /* Loop 5: Distribute received input to per-player arrays */
@@ -1492,9 +1574,33 @@ void ApplyNetworkPlayerState(void)
         if (net_is_host() && header == NET_MSG_LEAVE) {
             if (from_slot >= 1 && from_slot < NET_MAX_PLAYERS) {
                 DebugLog("Host: slot %d sent LEAVE\n", from_slot);
-                net_unregister_slot(from_slot);
-                s_hostSlotLastRecvMs[from_slot] = 0;
-                host_release_slot_identity(from_slot);
+                if (!g_netAcceptJoins && g_playerBase[from_slot].netActive) {
+                    host_drop_racer(from_slot);          /* mid-race: others go on */
+                } else {
+                    net_unregister_slot(from_slot);
+                    s_hostSlotLastRecvMs[from_slot] = 0;
+                    host_release_slot_identity(from_slot);
+                }
+            }
+            continue;
+        }
+
+        /* ---- Client: who is still racing / host closing ---- */
+        if (!net_is_host() && header == NET_MSG_ACTIVE_MASK && len >= 8) {
+            unsigned mask = rl32u(buf + 4);
+            for (i = 0; i < (int)g_numPlayers && i < NET_MAX_PLAYERS; i++) {
+                if (i != g_localPlayerIndex && !((mask >> i) & 1)
+                    && g_playerBase[i].netActive) {
+                    NetPlayerLeft(i, 0);
+                }
+            }
+            continue;
+        }
+        if (!net_is_host() && header == NET_MSG_HOST_LEFT) {
+            if (g_netSessionActive && g_introCountdown == 0 && g_postRaceCameraMode == 0
+                && g_netDisconnectFlag == 0) {
+                client_lost_host("THE HOST LEFT THE RACE");
+                return;                                   /* session is closed now */
             }
             continue;
         }
@@ -2021,15 +2127,9 @@ void ApplyNetworkPlayerState(void)
         DWORD now    = timeGetTime();
         DWORD silent = now - s_lastHostPacketMs;
         if (silent > 5000 && g_netDisconnectFlag == 0) {
-            DebugLog("Host disconnected (silent for %ums) — exiting race\n",
-                     (unsigned)silent);
-            g_netDisconnectFlag = 1;
-            if (g_fadeState != FADE_OUT) {
-                g_fadeState = FADE_OUT;
-                g_fadeSpeed = 0xC;
-            }
+            DebugLog("Host disconnected (silent for %ums)\n", (unsigned)silent);
             s_lastHostPacketMs = 0;
-            s_haveSlotAssign   = 0;
+            client_lost_host("CONNECTION TO THE HOST LOST");
         }
     }
 
@@ -2222,6 +2322,15 @@ void NetPauseRemote(int slot, int state)
     }
 }
 
+static void np_player_gone(int slot)
+{
+    if (s_npRemoteSlot == slot) {
+        DebugLog("Net: pauser slot %d left - unfreezing\n", slot);
+        s_npRemoteSlot = -1;
+        np_start_countdown();
+    }
+}
+
 /* Race frozen by the network (someone else paused, or the resume countdown). */
 int NetRaceFrozen(void)
 {
@@ -2306,8 +2415,17 @@ void NetPauseDraw(void)
 {
     extern void DrawDebugOverlayText(const char *s, int x, int y, int pixSz, uint32_t color);
     char line[64];
-    if (!net_is_active()) return;
     DWORD now = timeGetTime();
+    if (s_noticeUntil != 0) {
+        if ((int)(now - s_noticeUntil) >= 0) {
+            s_noticeUntil = 0;
+        } else {
+            DrawDebugOverlayText(s_noticeText, (640 - (int)strlen(s_noticeText) * 12) / 2, 120, 2, 0xFFFFFFFF);
+            if (s_noticeText2[0])
+                DrawDebugOverlayText(s_noticeText2, (640 - (int)strlen(s_noticeText2) * 12) / 2, 146, 2, 0xC0C0C0C0);
+        }
+    }
+    if (!net_is_active()) return;
     unsigned left = 0;
     if (s_npLocalPaused || s_npRemoteSlot >= 0) {
         DWORD el = now - s_npStartMs;

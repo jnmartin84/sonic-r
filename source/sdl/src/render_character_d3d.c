@@ -2059,6 +2059,7 @@ void RenderAllCharacterModels(int numPlayers)
 
     for (int i = 0; i < numPlayers; i++) {
         Player *player = &g_playerBase[i];
+        { extern int NetPlayerGone(int); if (NetPlayerGone(i)) continue; }   /* left the online race */
 
         /* 0x45B02D: Shadow setup — call if player->yOffset == 0 or 0x60000 */
         int animField = player->yOffset;
