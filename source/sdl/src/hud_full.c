@@ -674,11 +674,10 @@ void RenderHUD(void)
                  * tiles z-fight with the track surface at some spots (streaky
                  * beige floor), so it must never write depth: the track drawn
                  * right after then always wins where the two overlap. */
-                /* (Depth writes stay on: with them off, everything below the
-                 * water line - the bottoms of islands and rocks - showed
-                 * through the sea as a "reflection" the PC never draws. The
-                 * z-fighting is handled by GRID_DEPTH_BIAS instead.) */
+                R_PushState();
+                R_SetDepthWrite(0);
                 RenderPlayfieldGridD3D(skyBase, skyUpper, vpCfg);
+                R_PopState();
 #else
                 RenderPlayfieldGridD3D(skyBase, skyUpper, vpCfg);
 #endif

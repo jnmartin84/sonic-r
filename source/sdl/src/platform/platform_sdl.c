@@ -462,8 +462,9 @@ int platform_init(int width, int height, int fullscreen, const char *title)
         int want720 = 0;
         extern int g_xbVideoMode;   /* Options > Graphics > Resolution (save.c) */
         if (g_xbVideoMode >= 0) {
+            /* 1 (old pillarboxed 720p setting) now also means full-screen 720p. */
             want720 = (g_xbVideoMode >= 1);
-            g_xbStretch = (g_xbVideoMode == 2);
+            g_xbStretch = want720;
         }
         else {
             FILE *cfg = fopen("D:\\VIDEO.TXT", "r");

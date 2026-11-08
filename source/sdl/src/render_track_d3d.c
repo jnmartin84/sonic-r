@@ -471,11 +471,19 @@ static void FUN_0045ca28(int vpIdx)
 
     /* Update scroll counters (skip if paused or snow) — 0x45cacd-b6e */
     if (g_isPaused == 0 && g_weatherType != WEATHER_SNOW) {
+#ifdef SONICR_XBOX
+        /* The PC runs this once per rendered frame, and its D3D renderer
+         * draws faster than the 30 fps game logic, so the ripples move about
+         * twice as fast there. Step twice per frame to match. */
+        for (int rep = 0; rep < 2; rep++)
+#endif
+        {
         g_waterScrollA = (g_waterScrollA + 0x13)  & 0xFFF;
         g_waterScrollB = (g_waterScrollB - 0x22)  & 0xFFF;
         g_waterScrollC = (g_waterScrollC + 0x19)  & 0xFFF;
         g_waterScrollD = (g_waterScrollD - 0x2A)  & 0xFFF;
         g_waterScrollE = (g_waterScrollE + 0x1B)  & 0xFFF;
+        }
     }
 
     int sA = g_waterScrollA;

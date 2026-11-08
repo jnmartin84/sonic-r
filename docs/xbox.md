@@ -164,8 +164,9 @@ The game renders at 640x480 (4:3) game coordinates. By default the Xbox build
 runs at **640x480**: 480p if the dashboard has 480p enabled (HD AV pack /
 component cable), 480i if not.
 
-The mode is chosen in **Options > Graphics > Resolution**: 480P, 720P (4:3
-with black side bars) or 720P FULL (stretched to fill a 16:9 screen). It is
+The mode is chosen in **Options > Graphics > Resolution**: 480P or 720P
+(the 4:3 image stretched to fill a 16:9 screen; the pillarboxed 720p variant
+was dropped from the menu). It is
 saved with the settings and takes effect the next time the game starts; 720p
 also needs to be enabled in the dashboard. Without a choice there, 720p can
 still be forced the old way: create a text file `VIDEO.TXT` next to `default.xbe`

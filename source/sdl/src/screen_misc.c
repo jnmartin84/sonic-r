@@ -733,15 +733,16 @@ static void DrawOptionItem(int xPos, int itemIndex)
     if (itemIndex == 28) {
         /* Resolution row: the video mode, drawn as text. */
         extern int g_xbVideoMode, g_xbRunningMode, g_xb720Allowed;
-        static const char *names[3] = { "480P", "720P", "720P FULL" };
         int mode = g_xbVideoMode >= 0 ? g_xbVideoMode : g_xbRunningMode;
         int y = xPos * 2;
-        DrawPixText(names[mode], 0x148, y + 6, 3, 0xFFFFFFFF);
-        if (mode >= 1 && !g_xb720Allowed) {
-            DrawPixText("ENABLE 720P IN THE DASHBOARD", 0xD0, y + 38, 2, 0xFFC0C0C0);
-        }
-        else if (mode != g_xbRunningMode) {
-            DrawPixText("RESTART THE GAME TO APPLY", 0xD0, y + 38, 2, 0xFFC0C0C0);
+        DrawPixText(mode ? "720P" : "480P", 0x148, y + 6, 3, 0xFFFFFFFF);
+        /* Hint in the empty space at the bottom of the page, centred. */
+        const char *hint = NULL;
+        if (mode && !g_xb720Allowed) hint = "ENABLE 720P IN THE DASHBOARD";
+        else if ((mode ? 1 : 0) != (g_xbRunningMode ? 1 : 0)) hint = "RESTART THE GAME TO APPLY";
+        if (hint) {
+            int w = (int)strlen(hint) * 12;
+            DrawPixText(hint, (640 - w) / 2, 400, 2, 0xFFFFFF80);
         }
         return;
     }
@@ -1602,10 +1603,11 @@ int OptionsMenuScreen(void)
                         case 15: { /* item 23: Xbox video mode 480p / 720p / 720p full */
                             extern int g_xbVideoMode, g_xbRunningMode;
                             extern void SaveGameSettings(void);
+                            /* Two choices: 480p, or 720p filling the 16:9 screen
+                             * (the pillarboxed 720p mode was dropped). */
                             int cur = g_xbVideoMode >= 0 ? g_xbVideoMode : g_xbRunningMode;
-                            int v = cur + direction;
-                            if (v < 0) v = 0;
-                            if (v > 2) v = 2;
+                            cur = cur ? 2 : 0;
+                            int v = direction > 0 ? 2 : 0;
                             if (v != cur) {
                                 g_xbVideoMode = v;
                                 SaveGameSettings();
