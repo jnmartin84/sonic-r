@@ -84,8 +84,11 @@ Up to four pads are supported for split-screen.
 
 **Options > Graphics:**
 
-- *Resolution:* 480P or 720P (the 4:3 picture stretched to fill a 16:9 screen).
-  Applied the next time the game starts; 720p must be enabled in the dashboard.
+- *Resolution:* 480P or 720P (the 4:3 picture stretched to fill a 16:9 screen),
+  each at **30 FPS** (as the game) or **60 FPS** (see [60 fps](#60-fps)). Left
+  and right step through the four choices. The resolution is applied the next
+  time the game starts (720p must be enabled in the dashboard); the frame rate
+  applies at once.
 - *Draw Distance:* Far is the PC maximum; Very Far reaches beyond it.
 
 **Exit to Dashboard** is an entry in the options menu. **In-game reset:** hold
@@ -137,6 +140,18 @@ The game draws in 640x480 (4:3). By default the Xbox runs at 640x480: 480p when
 the dashboard allows it (component/HD AV cable), 480i otherwise. 720p is chosen
 in Options > Graphics (see above). Before a choice is saved, a text file
 `VIDEO.TXT` next to `default.xbe` starting with `W` also selects 720p.
+
+## 60 fps
+
+The game's logic (physics, AI, timers) runs 30 times a second, and so does the
+retail game. With **60 FPS** selected, each logic tick is shown twice: a frame
+halfway from the previous tick (cameras, players and their animation poses,
+track decorations, particles, rain and snow), then the tick's own. The method
+comes from the PSP port by ghurone. Gameplay, timing and online play are
+unchanged. If a scene is too heavy for two frames per tick (for example four
+players at 720p) the extra frames are dropped for a second by themselves, so the
+game never runs slower than at 30 fps. It is off by default; if you see
+anything wrong with it, switch back to 30 FPS and report it.
 
 ## Saves
 
@@ -201,14 +216,21 @@ Fidelity work against the 1998 EXE (all shared with the other platforms): the
 water reflection, sky panorama, weather (rain, snow, splashes, lightning),
 character jet/glow animation, particles, track IDs (the EXE numbers Factory 3
 and Ruin 4; the decompilation swaps both consistently), fog and the 2-player
-water scale were checked or corrected instruction by instruction. Small seams at
-some geometry joins are part of the original game.
+water scale were checked or corrected instruction by instruction. The PSP port's
+fixes were checked against the EXE too and applied: the Radiant Emerald start
+sign's height, the course menu opening on the last course, the kept
+split-screen choice, and two file handles leaked on every race load. Small seams
+at some geometry joins are part of the original game.
 
 ## Credits
 
 - **Original game:** *Sonic R* (1997/1998) by **Traveller's Tales** and
   **Sonic Team**, published by **SEGA**. Sonic R and all related names are
   trademarks of SEGA. This project contains no game assets.
+- **[ghurone](https://github.com/ghurone/Sonic-R-PSP)**: the PSP port of the same decompilation. Its 60 fps
+  interpolation method and several fixes (Radiant Emerald start sign, course menu,
+  file handle leak) were studied and reimplemented here, and its README layout
+  inspired this project's page.
 - **[jnmartin84](https://github.com/jnmartin84)**: the Sonic R decompilation and
   cross-platform engine (desktop, Dreamcast, online mode) this port is built on.
 - **Xbox port:** all code of the Xbox port was written by **Claude** (Anthropic's

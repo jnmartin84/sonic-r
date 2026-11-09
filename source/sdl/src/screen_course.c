@@ -77,8 +77,13 @@ int CourseSelectScreen(void)
     g_fadeState = FADE_IN;
     g_screenResult = SCREEN_BACK;
     g_renderEnabled = 1;
-    g_menuCursor = 0;
-    g_menuCursorY = s_trackPositionY[0];
+    /* 0x48DF88-0x48DFD0: the course chosen last, unless that was Radiant
+     * Emerald and it is locked (another save loaded) */
+    if (g_lastCourseCursor == 4 && g_gpAllTracksFlag == 0) {
+        g_lastCourseCursor = 0;
+    }
+    g_menuCursor = g_lastCourseCursor;
+    g_menuCursorY = s_trackPositionY[g_menuCursor];
     g_menuCursorTargetY = g_menuCursorY;
 
     DWORD idleStart = timeGetTime();
@@ -122,6 +127,7 @@ int CourseSelectScreen(void)
              * No swap needed — cursor+1 already gives the right C trackId. */
             if ((g_inputBits & 6) != 0 && g_menuCursorTargetY == g_menuCursorY) {
                 PlaySoundEffect(2, 0, 0);
+                g_lastCourseCursor = g_menuCursor;   /* 0x48E113 */
                 g_screenResult = g_menuCursor + 1;
                 g_trackId = g_menuCursor + 1;
                 g_fadeState = FADE_OUT;

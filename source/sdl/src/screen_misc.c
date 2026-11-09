@@ -776,10 +776,13 @@ static void DrawOptionItem(int xPos, int itemIndex)
 #ifdef SONICR_XBOX
     if (itemIndex == 28) {
         /* Resolution row: the video mode, drawn as text. */
-        extern int g_xbVideoMode, g_xbRunningMode, g_xb720Allowed;
+        extern int g_xbVideoMode, g_xbRunningMode, g_xb720Allowed, g_xb60;
         int mode = g_xbVideoMode >= 0 ? g_xbVideoMode : g_xbRunningMode;
         int y = xPos * 2;
-        DrawPixText(mode ? "720P" : "480P", 0x148, y + 6, 3, 0xFFFFFFFF);
+        /* video mode, then the race frame rate (60: interp.c, off by default) */
+        DrawPixText(mode ? (g_xb60 ? "720P  60 FPS" : "720P  30 FPS")
+                         : (g_xb60 ? "480P  60 FPS" : "480P  30 FPS"),
+                    0x148, y + 6, 3, 0xFFFFFFFF);
         /* Hint in the empty space at the bottom of the page, centred. */
         const char *hint = NULL;
         if (mode && !g_xb720Allowed) hint = "ENABLE 720P IN THE DASHBOARD";
@@ -1645,15 +1648,19 @@ int OptionsMenuScreen(void)
                         /* case 15: item 23 — display resolution change (stub for SDL) */
 #ifdef SONICR_XBOX
                         case 15: { /* item 23: Xbox video mode 480p / 720p / 720p full */
-                            extern int g_xbVideoMode, g_xbRunningMode;
+                            extern int g_xbVideoMode, g_xbRunningMode, g_xb60;
                             extern void SaveGameSettings(void);
-                            /* Two choices: 480p, or 720p filling the 16:9 screen
-                             * (the pillarboxed 720p mode was dropped). */
+                            /* Four choices, left/right steps through them: 480p or
+                             * 720p filling the 16:9 screen (the pillarboxed 720p
+                             * mode was dropped), each at 30 or 60 fps in a race. */
                             int cur = g_xbVideoMode >= 0 ? g_xbVideoMode : g_xbRunningMode;
-                            cur = cur ? 2 : 0;
-                            int v = direction > 0 ? 2 : 0;
-                            if (v != cur) {
-                                g_xbVideoMode = v;
+                            int st = (cur ? 2 : 0) + (g_xb60 ? 1 : 0);
+                            int ns = st + direction;
+                            if (ns < 0) ns = 0;
+                            if (ns > 3) ns = 3;
+                            if (ns != st) {
+                                g_xbVideoMode = (ns >> 1) ? 2 : 0;
+                                g_xb60 = ns & 1;
                                 SaveGameSettings();
                                 PlaySoundEffect(1, 0, 0);
                             }

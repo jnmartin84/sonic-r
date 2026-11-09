@@ -126,9 +126,6 @@ static const int s_factoryParticleObjIndices[46] = {
     912,913,914,915,916,917,918,919,920,921,922,923,924,925,
 };
 
-/* Emerald: object bobbing counter */
-static int s_emeraldBobCounter;
-
 
 
 
@@ -1604,15 +1601,17 @@ void AnimateTrackObjects_Emerald(void)
 {
     int *obj = (int *)g_objectStructArray;
 
-    s_emeraldBobCounter++;
+    g_animState310++;                       /* 0x4797A4: [0x925310] */
 
-    if (s_emeraldBobCounter == 100) {
-        s_emeraldBobCounter = 0;
+    if (g_animState310 == 100) {
+        g_animState310 = 0;
     }
 
-    /* Sine-driven bobbing */
+    /* Sine-driven bobbing about the sign's own height (0x4797CF: + [0x9252B0]),
+     * as the other tracks' AnimateTrackObjects do theirs. Without the base the
+     * start sign hung at 0, under the track (jnmartin84/sonic-r#27). */
     *(int *)((char *)obj + 0xDC9C) =
-        (g_sinTable[g_menuCursor & 0xFFF] >> 10) + 0 /* g_emeraldBaseHeight */;
+        (g_sinTable[g_menuCursor & 0xFFF] >> 10) + g_animBobBaseY;
 
     /* Rotation from half-speed sine */
     *(unsigned short *)((char *)obj + 0xDC92) =

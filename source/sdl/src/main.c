@@ -1920,7 +1920,16 @@ race_start:
 #endif
             if (g_skipThisFrame == 0) {
                 UpdateFrameTimers();
+#ifdef SONICR_XBOX
+                /* 60 fps (interp.c, Options > Graphics): the frame halfway from the
+                 * last tick shown first, then this tick's own */
+                { extern void Interp_Frame(void), Interp_Save(void);
+                  Interp_Frame();
+                  RenderHUD();
+                  Interp_Save(); }
+#else
                 RenderHUD();
+#endif
             }
             RACE_MARK("after RenderHUD");
 #ifdef SONICR_XBOX

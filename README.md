@@ -12,6 +12,8 @@ toolchain. Tested on real hardware (component video, 480p and 720p).
 
 - **Original game:** Traveller's Tales and Sonic Team, published by SEGA.
 - **Decompilation and cross-platform engine:** [jnmartin84](https://github.com/jnmartin84/sonic-r).
+- **PSP port:** [ghurone](https://github.com/ghurone/Sonic-R-PSP). Its 60 fps method and
+  several fixes were studied and reimplemented for the Xbox.
 - **Xbox port:** all of the code was written by **Claude** (Anthropic's AI, through Claude Code).
 - **XadPT** did not program anything. XadPT gave Claude every instruction and
   direction for the port and tested everything that could be tested on a real
@@ -31,7 +33,8 @@ but never sold. See [LICENSE](LICENSE).
 - **Faithful to the 1998 PC version.** Behaviour and visuals were compared with
   `SONICR.EXE` function by function, including fog, weather, water and sky
   details.
-- **480p and 720p** (720p stretches the 4:3 picture to 16:9), selectable in
+- **480p and 720p** (720p stretches the 4:3 picture to 16:9) and an optional
+  **60 fps** mode (logic at 30 Hz, a halfway frame in between), selectable in
   Options > Graphics, plus a *Very Far* draw distance.
 - **Online and LAN play** (up to 4 players), with a 5 second countdown before
   the race starts, and the race carrying on if a player leaves or loses

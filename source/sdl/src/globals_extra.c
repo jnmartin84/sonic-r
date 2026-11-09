@@ -229,6 +229,8 @@ int g_soundActive[64];
 int g_cdAvailable;
 
 /* Menus */
+int g_prevNumViewports = 1;             /* 0x0068AF74 — boot value, 0x4CD9AB */
+int g_lastCourseCursor = 0;             /* 0x0068AF94 — boot value, 0x4CD9B7 */
 int g_lastMenuSelection;
 int g_lastTimeAttackSelection;
 int g_menuAnimY;

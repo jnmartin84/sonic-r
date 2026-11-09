@@ -110,9 +110,20 @@ static void LoadTrackGeometry(void)
     else if (g_trackId >= TRACK_RESORT_ISLAND && g_trackId <= TRACK_RADIANT_EMERALD) {
         g_nextLoadFilename = s_trackBinPaths[g_trackId];
     }
+    /* Port fix (as the PSP port): the binary opens SONICR.BIT, then the track's
+     * BIN over the same handle, skips a byte of it and never closes either;
+     * LoadTrack3 opens the BIN again for itself. Two handles leaked per race. */
     OpenTrackFileA();
+    if (g_fileHandle != NULL) {
+        fClose(g_fileHandle);
+        g_fileHandle = NULL;
+    }
     OpenTrackFileB();
     SkipTrackHeader();
+    if (g_fileHandle != NULL) {
+        fClose(g_fileHandle);
+        g_fileHandle = NULL;
+    }
 }
 
 static void LoadTrackData(void)

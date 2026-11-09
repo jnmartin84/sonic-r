@@ -1030,6 +1030,29 @@ void RenderCharacterD3D(Player *player)
     int animFrameIdx = player->animFrameIdx;
     int *animFrame = (int *)((char *)g_animFrameData +
                     (animLimbBase + animFrameIdx * limbCount) * 0x18);
+#ifdef SONICR_XBOX
+    /* 60 fps (interp.c, after the PSP port): the halfway frame's pose, each limb
+     * halfway from the last tick's animation frame to this one's: offsets
+     * halved, angles the short way round (12 bits) */
+    {
+        extern int Interp_PrevAnimFrame(const Player *p);
+        static int s_halfPose[48 * 6];
+        int prevIdx = Interp_PrevAnimFrame(player);
+        if (prevIdx >= 0 && limbCount > 0 && limbCount <= 48) {
+            const int *a = (const int *)((const char *)g_animFrameData + (animLimbBase + prevIdx * limbCount) * 0x18);
+            for (int i = 0; i < limbCount * 6; i++) {
+                int k = i % 6;
+                if (k < 3) {
+                    s_halfPose[i] = a[i] + (animFrame[i] - a[i]) / 2;
+                } else {
+                    int d = ((animFrame[i] - a[i] + 0x800) & 0xFFF) - 0x800;
+                    s_halfPose[i] = (a[i] + d / 2) & 0xFFF;
+                }
+            }
+            animFrame = s_halfPose;
+        }
+    }
+#endif
 
     #define MAX_LIMB_VERTS 512  /* raised from 128 — Eggman's limbs exceed 128 */
 

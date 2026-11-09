@@ -367,6 +367,8 @@ int g_lastSaveSlot = -1;
  * screen (stretched); -1 = not chosen (D:\VIDEO.TXT or 480p). Read before
  * the video mode is set; a change applies on the next start. */
 int g_xbVideoMode = -1;
+/* 60 fps in races (Options > Graphics, interp.c): 0 = 30 fps as the game. */
+int g_xb60 = 0;
 
 int LoadGameSettings(void)
 {
@@ -421,6 +423,8 @@ int LoadGameSettings(void)
         g_lastSaveSlot = (buf[32] >= 1 && buf[32] <= 10) ? buf[32] - 1 : -1;
         /* Xbox video mode chosen in Options > Graphics (mode + 1, 0 = unset). */
         g_xbVideoMode = (buf[33] >= 1 && buf[33] <= 3) ? buf[33] - 1 : -1;
+        /* 60 fps in races (interp.c): 60 = on, anything else off. */
+        g_xb60 = (buf[34] == 60);
     }
     return 1;
 }
@@ -467,6 +471,7 @@ void SaveGameSettings(void)
     }
     buf[32] = (g_lastSaveSlot >= 0) ? g_lastSaveSlot + 1 : 0;
     buf[33] = (g_xbVideoMode >= 0) ? g_xbVideoMode + 1 : 0;
+    buf[34] = g_xb60 ? 60 : 0;
 
     bswap32_arr(buf, 40);
     FILE *fp = fOpen("SONICR.INF", "wb");

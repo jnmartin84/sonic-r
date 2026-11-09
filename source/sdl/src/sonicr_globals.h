@@ -753,7 +753,10 @@ extern int          g_stateBlock92528C[151]; /* 0x0092528C */
 #define g_animState33C      g_stateBlock92528C[44]   /* 0x92533C */
 
 /* [59] and [99] — screen plumbing */
-#define g_prevNumViewports  g_stateBlock92528C[59]   /* 0x925378 — numViewports saved across screens */
+/* The menus' kept choices live outside the 0x92528C block (0x68AF74, 0x68AF94),
+ * so they survive the track-init clear: */
+extern int g_prevNumViewports;    /* 0x68AF74 — numViewports saved across screens, boot: 1 (0x4CD9AB) */
+extern int g_lastCourseCursor;    /* 0x68AF94 — course chosen last, boot: 0 (0x4CD9B7) */
 #define g_screenResult      g_stateBlock92528C[99]   /* 0x925418 — value every screen function returns */
 
 /* [128]-[150] 0x92548C-0x9254E4 — above the track-init clear.
