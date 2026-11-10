@@ -239,6 +239,7 @@ void SendNetworkHostData(void);                         /* 0x00487D64 */
 int  net_should_run_physics(int playerIdx);
 int  NetRaceEndPending(void);    /* port (#34): race over, but the agreed result is still due */
 int  NetRaceResultFinal(void);   /* port (#34): standings are the agreed result; don't re-sort */
+int  NetJoinRetryTick(void);     /* port (#7): resend JOIN_REQ until answered; 1 waiting, -1 gave up */
 void UpdateNetworkClient(void);                         /* 0x00487EC0 */
 void SendNetworkClientData(void);                       /* 0x00487F7C */
 void UpdateNetworkSync(const void *data, int len);      /* 0x00487644 */

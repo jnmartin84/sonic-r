@@ -1781,7 +1781,12 @@ void ApplyNetworkPlayerState(void)
                     joinerRegion = (uint8_t)buf[4 + MM_MAX_USERNAME + NET_PLATFORM_LEN];
                 }
 
-                g_netPlayerCount = from_slot + 1;  /* grow as players join */
+                /* Grow as players join. Clients repeat JOIN_REQ until their
+                 * SLOT_ASSIGN arrives (#7), so a repeat from an earlier slot
+                 * can come after a later player joined — never shrink. */
+                if (from_slot + 1 > g_netPlayerCount) {
+                    g_netPlayerCount = from_slot + 1;
+                }
                 DebugLog("Host: client joined as slot %d ('%s' %s r%d), playerCount=%d\n",
                          from_slot, joinerName, joinerPlatform, joinerRegion, g_netPlayerCount);
 

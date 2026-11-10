@@ -4349,6 +4349,7 @@ extern int g_screenFPS;                 /* 0x6E9CDC */
 /* g_netProviderChoice is g_stateBlock92528C[0] — aliased in sonicr_globals.h */
 
 static void DrawPixText(const char *s, int x, int y, int pixSz, uint32_t color);
+static int PixTextWidth(const char *s, int pixSz);
 
 /* On-screen matchmaker debug overlay */
 #define NET_DBG_LINES 6
@@ -4623,6 +4624,45 @@ static int s_pickerCursor = 0;
 static int s_pickerRefreshFrame = 0;
 static unsigned char s_pickerLastInput = 0xFF;
 static int s_pickerPrevState = -1;
+
+/* Join retry state for the lobby screens (#7): whether a join is still
+ * waiting on the host, and until when to say the last attempt failed. */
+static int   s_joinWaiting = 0;
+static DWORD s_joinFailedUntilMs = 0;
+
+/* Run once per lobby frame on both lobby screens: keep asking the host for a
+ * slot, and if it never answers, drop the connection and go back to the
+ * host/join choice instead of sitting in an empty lobby. */
+static void LobbyJoinTick(void)
+{
+    int joinState = NetJoinRetryTick();
+    s_joinWaiting = (joinState > 0);
+    if (joinState < 0) {
+        DebugLog("Join: no answer from host, giving up\n");
+        NetDbgPush("JOIN TIMED OUT");
+        CloseDirectPlaySession();
+        PlaySoundEffect(0, 0, 0);
+        ns_lobbyState = 0;
+        ns_setupMode = 0;
+        s_joinFailedUntilMs = timeGetTime() + 4000;
+    }
+}
+
+/* Lobby overlay lines for the join retry: "JOINING..." while waiting, and
+ * the failure notice on the host/join screen for a few seconds after. */
+static void DrawLobbyJoinStatus(void)
+{
+    if (ns_lobbyState == 2 && s_joinWaiting) {
+        const char *msg = "JOINING...";
+        int w = PixTextWidth(msg, 3);
+        DrawPixText(msg, (640 - w) / 2, 220, 3, 0xFFFFFFFF);
+    }
+    if (ns_lobbyState == 0 && (int)(s_joinFailedUntilMs - timeGetTime()) > 0) {
+        const char *msg = "COULD NOT JOIN - HOST DID NOT ANSWER";
+        int w = PixTextWidth(msg, 3);
+        DrawPixText(msg, (640 - w) / 2, 320, 3, 0xFFFFFFFF);
+    }
+}
 
 /* Convert a C string to the in-game-font glyph-ID array.
  * Mapping: a-z/A-Z → 0..25, 0-9 → 26..35.  Other chars are skipped.
@@ -5281,6 +5321,7 @@ int NetworkScreen(void)
          * are processed during the lobby. Binary's recv thread handled
          * this; our thread enqueues but the main thread must dispatch. */
         ApplyNetworkPlayerState();
+        LobbyJoinTick();                                      /* #7 */
 
         /* If fade active (g_fadeState != 0), skip to render */
         if (g_fadeState != 0) {                               /* 0x48AC33 */
@@ -5908,6 +5949,8 @@ render_frame:
                 }
             }
 
+            DrawLobbyJoinStatus();                             /* #7 */
+
             /*  Mode-select prompt (state 0), join-search (state 1),
              * matchmaker session picker (state 3), and in-lobby username
              * (state 2) overlays.
@@ -6385,6 +6428,7 @@ int NetworkScreenReentry(void)
         ReadInput();
         NetSynthPadKeys();
         ApplyNetworkPlayerState();
+        LobbyJoinTick();                                      /* #7 */
 
         if (g_fadeState != 0) {
             goto render_frame_re;
@@ -6765,6 +6809,8 @@ render_frame_re:
                     }
                 }
             }
+
+            DrawLobbyJoinStatus();                             /* #7 */
 
             /* Mode-select / search prompt for states 0 and 1; in-lobby
              * username via the original game font for state 2+. Mirrors

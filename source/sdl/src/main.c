@@ -247,6 +247,67 @@ int CreateNetworkSession(const char *name, const char *password)
     return 0;
 }
 
+/* Join request retry (#7). The request and the host's SLOT_ASSIGN reply are
+ * single UDP packets; losing either used to leave the client in an empty lobby
+ * for good. Until a slot arrives the request is repeated every
+ * NET_JOIN_RETRY_MS, and after NET_JOIN_GIVE_UP_MS the lobby is told to give
+ * up. The host already answers a repeat from the same address with the same
+ * slot. */
+#define NET_JOIN_RETRY_MS    1000
+#define NET_JOIN_GIVE_UP_MS 10000
+static int   s_joinPending;
+static DWORD s_joinStartMs;
+static DWORD s_joinLastSendMs;
+
+/* Ask the host for a slot. Payload carries our matchmaker username so the
+ * host (and via SLOT_ASSIGN/PEER_NAME, the other clients) can populate the
+ * decoration table with real names. */
+static void SendJoinRequest(void)
+{
+    struct {
+        int     hdr;
+        char    name[MM_MAX_USERNAME];
+        char    platform[16];
+        uint8_t region;
+    } joinReq;
+    memset(&joinReq, 0, sizeof(joinReq));
+    joinReq.hdr = NET_MSG_JOIN_REQ;
+    const char *uname = MatchmakerGetUsername();
+    if (uname == NULL) {
+        uname = "";
+    }
+    strncpy(joinReq.name, uname, MM_MAX_USERNAME - 1);
+    strncpy(joinReq.platform, MM_PLATFORM, sizeof(joinReq.platform) - 1);
+    joinReq.region = (uint8_t)platform_get_region();
+    net_send_to_host(&joinReq, sizeof(joinReq));
+}
+
+/* Called every lobby frame. Returns 1 while still waiting for the host's
+ * answer (resending as needed), -1 once it is time to give up, 0 otherwise
+ * (no join in progress, or the slot has arrived). */
+int NetJoinRetryTick(void)
+{
+    if (!s_joinPending) {
+        return 0;
+    }
+    if (!net_is_active() || net_is_host() || net_local_slot() >= 0) {
+        s_joinPending = 0;
+        return 0;
+    }
+
+    DWORD now = timeGetTime();
+    if (now - s_joinStartMs >= NET_JOIN_GIVE_UP_MS) {
+        s_joinPending = 0;
+        return -1;
+    }
+    if (now - s_joinLastSendMs >= NET_JOIN_RETRY_MS) {
+        DebugLog("Join: no answer from host yet, asking again\n");
+        SendJoinRequest();
+        s_joinLastSendMs = now;
+    }
+    return 1;
+}
+
 /* 0x4870A8 — Client: discover host via broadcast, then connect */
 int JoinNetworkSession(const char *name, int enumIdx)
 {
@@ -267,26 +328,14 @@ int JoinNetworkSession(const char *name, int enumIdx)
     }
 
     if (net_client_connect(hostIp, NET_PORT_DEFAULT) == 0) {
-        /* Send join request so host assigns us a slot.  Payload carries our
-         * matchmaker username so the host (and via SLOT_ASSIGN/PEER_NAME, the
-         * other clients) can populate the decoration table with real names. */
-        struct {
-            int     hdr;
-            char    name[MM_MAX_USERNAME];
-            char    platform[16];
-            uint8_t region;
-        } joinReq;
-        memset(&joinReq, 0, sizeof(joinReq));
-        joinReq.hdr = NET_MSG_JOIN_REQ;
-        const char *uname = MatchmakerGetUsername();
-        if (uname == NULL) {
-            uname = "";
-        }
-        strncpy(joinReq.name, uname, MM_MAX_USERNAME - 1);
-        strncpy(joinReq.platform, MM_PLATFORM, sizeof(joinReq.platform) - 1);
-        joinReq.region = (uint8_t)platform_get_region();
-        net_send_to_host(&joinReq, sizeof(joinReq));
-        DebugLog("Joined session at %s:%d as '%s'\n", hostIp, NET_PORT_DEFAULT, joinReq.name);
+        /* Send join request so host assigns us a slot; NetJoinRetryTick
+         * repeats it until the host answers. */
+        SendJoinRequest();
+        s_joinPending = 1;
+        s_joinStartMs = timeGetTime();
+        s_joinLastSendMs = s_joinStartMs;
+        DebugLog("Joined session at %s:%d as '%s'\n", hostIp, NET_PORT_DEFAULT,
+                 MatchmakerGetUsername() ? MatchmakerGetUsername() : "");
         return 1;
     }
     DebugLog("JoinNetworkSession: connect failed\n");
