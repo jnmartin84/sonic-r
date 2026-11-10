@@ -1189,6 +1189,11 @@ int OptionsMenuScreen(void)
     for (;;) {
         platform_pump_events();
 
+        /* Frame start for the 30fps cap at the bottom of the loop — 0x493D5E
+         * stores timeGetTime() to [0x6E9D00] here, so the wait after the flip
+         * only covers what is left of the 33ms, not a full 33ms on top. */
+        g_currentTime = timeGetTime();
+
         /* Frame timing — compute elapsed seconds for idle timeout */
         unsigned int now = timeGetTime() / 1000;
         int delta = (int)(now - lastTime);
@@ -2089,9 +2094,8 @@ int OptionsMenuScreen(void)
         g_totalFrames2++;
         g_totalFrames++;
 
-        /* FPS cap — wait for 30fps.
-         * WaitForFrameCap uses g_currentTime as the frame start reference. */
-        g_currentTime = timeGetTime();
+        /* FPS cap — wait for 30fps (0x495383-0x4953A9), measured from the
+         * frame start taken at the top of the loop. */
         WaitForFrameCap();
     }
 }
@@ -2518,6 +2522,11 @@ int LoadSaveScreen(void)
     for (;;) {
         platform_pump_events();
 
+        /* Frame start for the 30fps cap at the bottom of the loop — 0x48F9B3
+         * stores timeGetTime() to [0x6E9D00] here, so the wait after the flip
+         * only covers what is left of the 33ms, not a full 33ms on top. */
+        g_currentTime = timeGetTime();
+
         /* Frame timing — compute elapsed seconds for idle timeout */
         unsigned int now = timeGetTime() / 1000;
         int delta = (int)(now - lastTime);
@@ -2889,8 +2898,8 @@ int LoadSaveScreen(void)
         g_totalFrames2++;                                    /* [0x8FB690] */
         g_totalFrames++;                                     /* [0x8FB68C] */
 
-        /* FPS cap */
-        g_currentTime = timeGetTime();
+        /* FPS cap — 0x4904D8-0x4904FE, measured from the frame start taken at
+         * the top of the loop. */
         WaitForFrameCap();
     }
 }
