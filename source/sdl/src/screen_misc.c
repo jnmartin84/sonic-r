@@ -68,7 +68,7 @@ void SetupMenuTexturesD3D(void);                /* 0x438CD8 */
 void FinalizeMenuTexturesD3D(void);             /* 0x438D10 */
 void UpdateFrameTimers(void);                   /* 0x47FDE8 */
 void UpdateVertexLighting(Player *player);      /* 0x430638 */
-void PollAllInputDevices(void);                 /* 0x479248 */
+void ShuffleCollectiblePlacement(void);         /* 0x479248 — track_anim_init.c */
 void RenderCharacterOnPodium(int xOff, int yOff, int zOffset,
                              int angleC, int angleD, int angleE,
                              Player *player);               /* 0x4437FC */
@@ -5211,8 +5211,8 @@ int NetworkScreen(void)
     g_optMenuMaxItem = 3;                                        /* [0x925298] = 3 */
     g_renderEnabled = 1;                                      /* [0x8FB81C] = 1 */
 
-    /* Controller init + timing */
-    PollAllInputDevices();                                    /* 0x479248 */
+    /* Online balloon / item placement for the host to broadcast */
+    ShuffleCollectiblePlacement();                            /* 0x48AB3D: call 0x479248 */
     lastTickSec = timeGetTime() / 1000;                       /* 0x48AB42-4D */
 
     /* Store initial time */
@@ -6328,7 +6328,7 @@ int NetworkScreenReentry(void)
     g_optMenuMaxItem = 3;
     g_renderEnabled = 1;
 
-    PollAllInputDevices();                                    /* 0x479248 */
+    ShuffleCollectiblePlacement();                            /* 0x48AB3D: call 0x479248 */
     lastTickSec = timeGetTime() / 1000;
     g_screenBaseTime = (int)timeGetTime();
     UpdateCDPlayback(5);

@@ -133,6 +133,12 @@ extern int g_portraitTextBuffer[];          /* 0x0068a6f0 */
  * by UpdateNetworkSync(g_netGameInfoDest, 0x30). [11] carries the MODE A/B bit
  * in its byte 2 (0x0068a8ca) — reach it through net_lobby_mode_b(). */
 extern int g_netGameInfoDest[];             /* 0x0068a89c */
+/* Collectible placement pairs, 17 shorts at bytes 0x0C..0x2D of that payload
+ * (0x0068a8a8). Low byte indexes the track's collectible positions, high byte
+ * the item positions. The host fills them (ShuffleCollectiblePlacement,
+ * 0x479248) and the broadcast carries them to every client; InitItems_MP reads
+ * them. Must stay inside g_netGameInfoDest or clients never receive them. */
+#define g_collectiblePlacement ((unsigned short *)((char *)g_netGameInfoDest + 0x0C))
 extern short g_netTrackIndex;               /* 0x0068a8a0 */
 extern short g_netRaceSubModeIndex;         /* 0x0068a8a2 */
 extern int g_netWeatherType;                /* 0x0068a8a4 */

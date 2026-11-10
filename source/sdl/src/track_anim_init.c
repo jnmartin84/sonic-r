@@ -80,10 +80,6 @@ intptr_t g_animDescTable[12 * 10] = { /* 0x004FF5A8 */
 
 int g_factoryObjState[46];                     /* 0x0068158C */
 int g_factoryObjAngle[46];                     /* 0x00681644 — per-object heading angles */
-/* Collectible placement pairs, one per spawned collectible. Low byte indexes
- * the track's collectible position table (s_collectPosTables), high byte
- * indexes s_itemPositions. Read by InitItems_MP. */
-unsigned short g_collectiblePlacement[64];   /* 0x0068A8A8 */
 /* g_randomTable is same memory as g_randomRingBuffer (0x0092498C, globals_extra.c).
  * g_randomRingBuffer[513] covers first 1026 bytes; g_randomTable[16384] = 32768 bytes total.
  * Use g_randomRingBuffer for the canonical 513-short ring; g_randomTable is the full 16K table. */
@@ -330,7 +326,6 @@ static const int s_itemPositions[17 * 3] = {
     0xFF,0x00,0x80, 0xC0,0x20,0x40,
 };
 
-extern unsigned short g_collectiblePlacement[];  /* 0x0068A8A8 — see definition above */
 
 /* Forward declarations */
 static void InitAnimIsland(void);
@@ -1404,10 +1399,62 @@ void InitItems_SP(void)
 }
 
 /* =====================================================================
+ * ShuffleCollectiblePlacement — 0x00479248 — 334 bytes
+ * (returns through InitItems_MP's epilogue at 0x47923B)
+ *
+ * Builds the online collectible placement pairs read by InitItems_MP.
+ * Called from NetworkScreen (0x48AB3D) right after the lobby config words
+ * are set; the host's result goes out with the rest of g_netGameInfoDest.
+ *
+ * Starts from the identity (entry i = position i, item i), then makes 32
+ * random swaps of the item byte between two distinct entries, then 32 of
+ * the position byte, so the two are shuffled independently.
+ * ===================================================================== */
+void ShuffleCollectiblePlacement(void)
+{
+    unsigned short *pairs = g_collectiblePlacement;
+
+    for (int i = 0; i < 17; i++) {                                 /* 0x47925C-0x479270 */
+        pairs[i] = (unsigned short)((i << 8) + i);
+    }
+
+    /* Swap item bytes (high) — 0x479276-0x4792FE */
+    for (int n = 0; n < 32; n++) {
+        int a = Random() / 0x788;                                  /* 0x4792D6 */
+        int b;
+        do {
+            b = Random() / 0x788;                                  /* 0x4792EE */
+        } while (b == a);
+        int lowA = pairs[a] & 0xFF;
+        int lowB = pairs[b] & 0xFF;
+        int highA = pairs[a] & 0xFF00;
+        int highB = pairs[b] & 0xFF00;
+        pairs[a] = (unsigned short)(highB + lowA);                 /* 0x4792BB */
+        pairs[b] = (unsigned short)(highA + lowB);                 /* 0x4792C9 */
+    }
+
+    /* Swap position bytes (low) — 0x479307-0x479390 */
+    for (int n = 0; n < 32; n++) {
+        int a = Random() / 0x788;                                  /* 0x479369 */
+        int b;
+        do {
+            b = Random() / 0x788;                                  /* 0x479381 */
+        } while (b == a);
+        int lowA = pairs[a] & 0xFF;
+        int lowB = pairs[b] & 0xFF;
+        int highA = pairs[a] & 0xFF00;
+        int highB = pairs[b] & 0xFF00;
+        pairs[a] = (unsigned short)(highA + lowB);                 /* 0x47934C */
+        pairs[b] = (unsigned short)(highB + lowA);                 /* 0x479358 */
+    }
+}
+
+/* =====================================================================
  * InitItems_MP — 0x0047913C — 265 bytes
  *
  * Multiplayer item placement. Spawns g_numViewports * 4 + 1 collectibles,
- * taking each one's position pair from g_collectiblePlacement (0x68A8A8).
+ * taking each one's position pair from g_collectiblePlacement (0x68A8A8),
+ * which the host's ShuffleCollectiblePlacement filled.
  * ===================================================================== */
 void InitItems_MP(void)
 {
