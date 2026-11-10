@@ -1,4 +1,4 @@
-# Sonic R
+# Sonic R (latest release 2026/11/10)
 
 Here you will find a reimplementation of *Sonic R* (the 1998 Sega PC release),
 decompiled from the original executable and rebuilt as modern, portable C.
@@ -8,7 +8,7 @@ It runs natively on **Windows, macOS, and Linux** (via SDL2) and on the **Sega D
 ## AI Disclosure
 This project is the product of several months of reverse-engineering and 
 x86-to-C translation done with the use of Ghidra and Claude Code
-(using Opus 4.6, Opus 4.8 and Fable 5). 
+(using Opus 4.6, Opus 4.8, Fable 5, Opus 5 and Opus 5.5). 
 
 This has been extensively tested and validated against live WinDbg sessions running 1998 SONICR.EXE,
 along with playtesting by many *detail-oriented* Sonic R fans (special thanks to Mittens, Tongara and Neo.charmy).
@@ -29,8 +29,6 @@ Each guide is self-contained: how to get or build it, the game data you supply,
 controls, network play, saves, and troubleshooting for that platform.
 
 ## Legal & credits
-
-I personally report every for-sale listing of my ports that are brought to my attention. I will get your 15 year old 100% feedback eBay account terminated.
 
 Sonic R and its characters, trademarks, and game assets are the property of
 Sega. This is a from-scratch reimplementation of the game engine — it contains
