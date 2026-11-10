@@ -375,6 +375,7 @@ static void NetSnapshotReset(void)
     s_clientKeyframeCountdown = 0;
     memset(s_peerProtoSeen, 0, sizeof(s_peerProtoSeen));
     memset(s_peerProtoVersion, 0, sizeof(s_peerProtoVersion));
+    NetInterpReset();
 }
 
 /* Per-player state within a snapshot — matches 0xFFF0002F layout minus 4-byte header */

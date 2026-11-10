@@ -25,4 +25,8 @@
 void NetInterpRecord(int playerIdx);
 void NetInterpApply(void);
 
+/* NetInterpReset() — drop all snapshots; call at race start (slots are
+ *   reassigned by join order every race). */
+void NetInterpReset(void);
+
 #endif

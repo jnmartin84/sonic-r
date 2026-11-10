@@ -3,6 +3,7 @@
 #include "sonicr_globals.h"
 #include "platform.h"
 #include <stdint.h>
+#include <string.h>
 
 extern void DeriveGroundState(Player *player);   /* ground_collision.c */
 
@@ -56,6 +57,18 @@ void NetInterpRecord(int playerIdx)
     s_curr[playerIdx].valid = 1;
 }
 
+/* Forget every snapshot. Slots are handed out by join order each race, so a
+ * slot that was a remote player last race can be the local one now; its old
+ * snapshot would otherwise keep pinning that player to where the previous
+ * owner finished, and other players would show at last race's positions until
+ * their first new packet. Called at race start from NetSnapshotReset. */
+void NetInterpReset(void)
+{
+    memset(s_prev, 0, sizeof s_prev);
+    memset(s_curr, 0, sizeof s_curr);
+    memset(s_intervalMs, 0, sizeof s_intervalMs);
+}
+
 static int lerp_int(int a, int b, int alpha_q12)
 {
     return a + (int)(((long long)(b - a) * (long long)alpha_q12) >> 12);
@@ -78,6 +91,8 @@ void NetInterpApply(void)
     uint32_t now = platform_get_time_ms();
 
     for (int i = 0; i < MAX_PLAYERS; i++) {
+        /* The local player is driven by local physics, never by snapshots. */
+        if (i == g_localPlayerIndex) continue;
         if (!s_curr[i].valid) continue;
 
         Player *p = &g_playerBase[i];
