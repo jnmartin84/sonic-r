@@ -126,10 +126,6 @@ static const int s_factoryParticleObjIndices[46] = {
     912,913,914,915,916,917,918,919,920,921,922,923,924,925,
 };
 
-/* Emerald: object bobbing counter */
-static int s_emeraldBobCounter;
-
-
 
 
 /* Reel state — contiguous block at 0x6816FC-0x681733.
@@ -1598,21 +1594,21 @@ void AnimateTrackObjects_Factory(void)
 
 /**
  * AnimateTrackObjects_Emerald — 0x004797A0 — 111 bytes
- * Animates the central emerald object with bobbing + rotation.
+ * Bobs and rolls the "GO!" box above the boost pad (object 830). Its resting height
+ * is g_animBobBaseY, taken from the track data by InitAnimEmerald.
  */
 void AnimateTrackObjects_Emerald(void)
 {
     int *obj = (int *)g_objectStructArray;
 
-    s_emeraldBobCounter++;
-
-    if (s_emeraldBobCounter == 100) {
-        s_emeraldBobCounter = 0;
+    g_animState310++;                                            /* 0x4797A4-0x4797AB */
+    if (g_animState310 == 100) {                                 /* 0x4797B1 */
+        g_animState310 = 0;                                      /* 0x4797B8 */
     }
 
-    /* Sine-driven bobbing */
+    /* Sine-driven bobbing around the resting height — 0x4797BE-0x4797E0 */
     *(int *)((char *)obj + 0xDC9C) =
-        (g_sinTable[g_menuCursor & 0xFFF] >> 10) + 0 /* g_emeraldBaseHeight */;
+        g_animBobBaseY + (g_sinTable[g_menuCursor & 0xFFF] >> 10);
 
     /* Rotation from half-speed sine */
     *(unsigned short *)((char *)obj + 0xDC92) =
