@@ -64,7 +64,7 @@ void EndFrame(void);                                    /* 0x00422BA0 */
 void FlipD3D(void);                                     /* 0x004356BC */
 void RestartD3D(void);                                  /* 0x00432BC8 */
 void ProcessTpageStates(void);                               /* 0x4323CC — 52-tpage state-machine processor */
-void RenderBackground(void);                            /* FUN_00435868 */
+void D3DAppClearBackBuffer(void);                       /* FUN_00435868 */
 void RenderFadeOverlay(void);                           /* FUN_00461DF4 */
 void SetCameraStructPtr(int *cam);                      /* helper — sets camera for matrix builds */
 void BuildViewMatrix(void);                             /* 0x0042316C */

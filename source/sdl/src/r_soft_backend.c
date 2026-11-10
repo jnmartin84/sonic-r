@@ -607,10 +607,10 @@ void R_ClearDepth(void)
 }
 
 /**
- * RenderBackground — 0x00435868
- * Binary does IDirect3DViewport2::Clear; both GL branches clear to black.
+ * D3DAppClearBackBuffer — 0x00435868
+ * Binary does IDirect3DViewport2::Clear with a black background material.
  */
-void RenderBackground(void)
+void D3DAppClearBackBuffer(void)
 {
     soft_clear_fb();
 }

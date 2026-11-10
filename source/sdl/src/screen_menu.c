@@ -26,7 +26,7 @@ void LoadMenuBitmaps(void);
 void LoadMenuBitmapsSoftware(void);
 void FinalizeMenuTexturesD3D(void);
 void ProcessTpageStates(void);
-void RenderBackground(void);
+void D3DAppClearBackBuffer(void);
 void RenderFadeOverlay(void);
 void platform_pump_events(void);
 
@@ -210,7 +210,7 @@ int MainMenuScreen(void)
         /* Render */
         ProcessTpageStates();
         BeginFrame();
-        RenderBackground();
+        D3DAppClearBackBuffer();
         EndFrame();
 
         BeginFrame();

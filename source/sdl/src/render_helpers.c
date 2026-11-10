@@ -1,7 +1,7 @@
 /**
  * render_helpers.c - Rendering helper functions
  *
- * DrawTexturedQuad, Blit2DSprite, RenderBackground, etc.
+ * DrawTexturedQuad, Draw3DModelD3D, ColorizeTpageHiColor, etc.
  * These are the workhorses called dozens of times per frame.
  */
 

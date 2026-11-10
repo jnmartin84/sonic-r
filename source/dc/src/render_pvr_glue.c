@@ -64,8 +64,8 @@ static const RenderVertex bg_v[4] = {
     { 0.0f,   480.0f, 0.00001f, 0.00001f, 0xFF000000, 0, 0.0f, 0.0f },
 };
 
-    /* RenderBackground — full-screen black quad on PT, behind everything else. */
-void RenderBackground(void)
+    /* D3DAppClearBackBuffer — full-screen black quad on PT, behind everything else. */
+void D3DAppClearBackBuffer(void)
 {
     R_SetTexture(-1);
     R_DrawQuad(bg_v);

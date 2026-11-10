@@ -23,7 +23,7 @@ void LoadMenuBitmaps(void);
 void LoadMenuBitmapsSoftware(void);
 void FinalizeMenuTexturesD3D(void);
 void ProcessTpageStates(void);
-void RenderBackground(void);
+void D3DAppClearBackBuffer(void);
 void RenderFadeOverlay(void);
 void WaitForFrameCap(void);
 void platform_pump_events(void);
@@ -167,7 +167,7 @@ int TimeAttackModeSelect(void)
         {
             ProcessTpageStates();
             BeginFrame();
-            RenderBackground();
+            D3DAppClearBackBuffer();
             EndFrame();
             if (g_fadeLevel < 0) {
                 RenderFadeOverlay();

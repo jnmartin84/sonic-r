@@ -20,7 +20,7 @@ void LoadTitleTextureD3D(void);
 void SetupD3DTexturesBegin(void);      /* FUN_00438ca4 */
 void FinalizeMenuTexturesD3D(void);
 void ProcessTpageStates(void);
-void RenderBackground(void);           /* FUN_00435868 */
+void D3DAppClearBackBuffer(void);      /* FUN_00435868 */
 void RenderFadeOverlay(void);          /* FUN_00461df4 */
 void SoftwareRenderSortedPolygons(void);
 void SetViewportFromConfig(int *config);
@@ -75,7 +75,7 @@ void WaitForFrameCap(void)
  * Auto-advances after 3 seconds or on A+Start press.
  *
  * D3D path: two render passes per frame.
- *   Pass 1: RenderBackground (wallpaper) + RenderFadeOverlay (iris iris)
+ *   Pass 1: D3DAppClearBackBuffer + RenderFadeOverlay (iris)
  *   Pass 2: RenderLogoQuads (6 textured quads for the logo image)
  */
 int SegaLogoScreen(void)
@@ -134,7 +134,7 @@ int SegaLogoScreen(void)
 
         ProcessTpageStates();
         BeginFrame();
-        RenderBackground();
+        D3DAppClearBackBuffer();
         EndFrame();
         if (g_fadeLevel < 0) {
             RenderFadeOverlay();
@@ -211,7 +211,7 @@ int TravellersTalesLogoScreen(void)
 
         ProcessTpageStates();
         BeginFrame();
-        RenderBackground();
+        D3DAppClearBackBuffer();
         EndFrame();
         if (g_fadeLevel < 0) {
             RenderFadeOverlay();
@@ -752,7 +752,7 @@ int TitleScreen(void)
         ProcessTpageStates();
         BeginFrame();
         SetViewportFromConfig(g_viewportArray);      /* line 8165: FUN_004cc0e8 */
-        RenderBackground();
+        D3DAppClearBackBuffer();
         EndFrame();
         SetViewportFromConfig(g_viewportArray);      /* line 8168: FUN_004cc0e8 */
         if (g_fadeLevel < 0) {

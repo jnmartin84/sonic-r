@@ -667,7 +667,7 @@ int CharacterSelectScreen(void)
         /* Rendering */
         ProcessTpageStates();
         BeginFrame();
-        RenderBackground();
+        D3DAppClearBackBuffer();
         EndFrame();
         if (g_fadeLevel < 0) {
             RenderFadeOverlay();

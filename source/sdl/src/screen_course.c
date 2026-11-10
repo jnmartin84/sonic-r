@@ -196,7 +196,7 @@ int CourseSelectScreen(void)
         /* Rendering (D3D path from disasm 0x48E6A0-0x48E9E0) */
         ProcessTpageStates();
         BeginFrame();
-        RenderBackground();
+        D3DAppClearBackBuffer();
         EndFrame();
         if (g_fadeLevel < 0) {
             RenderFadeOverlay();
@@ -669,7 +669,7 @@ int MultiPlayerScreen(void)
         /* Rendering (D3D path: 0x4894D6-0x4896D9) */
         ProcessTpageStates();
         BeginFrame();
-        RenderBackground();
+        D3DAppClearBackBuffer();
         EndFrame();
         if (g_fadeLevel < 0) {
             RenderFadeOverlay();

@@ -411,7 +411,7 @@ void GL_SetPendingRGBA(int tpage, unsigned char *rgba, int w, int h)
 }
 
 /**
- * BeginFrame — 0x00422AA4
+ * BeginFrame — 0x0042299C
  * Sets up the GL state for a rendering pass.
  * Original: IDirect3DDevice::BeginScene().
  */
@@ -625,12 +625,12 @@ void ProcessTpageStates(void)                                   /* 0x4323cc */
 {
     int changed;                                           /* EDI */
 
-    /* GL port: clear framebuffer + depth.  The original D3D function doesn't
-     * clear the screen, but the GL port's rendering pipeline relies on these
-     * call sites for depth buffer clearing (no other caller does it).
-     * Clear the full window (including letterbox bars) to black first,
-     * then enable a scissor rect so all subsequent glClear calls (e.g.
-     * RenderBackground sky color) stay inside the 4:3 area. */
+    /* GL port: clear color + depth for the full window (including the
+     * letterbox bars). The binary's ProcessTpageStates does not clear; the
+     * binary clears color + depth in D3DAppClearBackBuffer (0x435868), whose
+     * GL version clears color only and relies on this clear for depth.
+     * Then enable a scissor rect so all subsequent glClear calls (e.g.
+     * D3DAppClearBackBuffer) stay inside the 4:3 area. */
 
     /* Disable scissor so the black clear covers the entire window.
      * Ensure depth mask is ON — glClear respects glDepthMask, and a
@@ -747,31 +747,20 @@ void CleanupD3DTPages(void)                                /* 0x4332ac */
 }
 
 /**
- * RenderBackground — 0x00435868 — 189 bytes
- * Binary does IDirect3DViewport2::Clear (solid color fill).
- * For OpenGL: clear to color.
+ * D3DAppClearBackBuffer — 0x00435868 — 189 bytes
+ * Binary: IDirect3DViewport2::SetBackground(0x6264f0) + Clear(TARGET|ZBUFFER)
+ * over the whole client area. The background material (0x6264ec) is black:
+ * it is built from a zeroed D3DMATERIAL at 0x438fa7.
+ * GL clears color only. Every caller runs ProcessTpageStates first, which
+ * clears color + depth for the whole window.
  */
-void RenderBackground(void)
+void D3DAppClearBackBuffer(void)
 {
-    /* Confine glClear to the 4:3 area so sky/menu colors don't
-     * leak into the letterbox/pillarbox bars. */
+    /* Confine the clear to the 4:3 area. */
     R_SetScissor(g_glViewportOffsetX, g_glViewportOffsetY,
                  g_glBackingWidth, g_glBackingHeight);
     R_FlushState();
 
-    /* During racing, clear to black — the binary clears to black and uses
-     * fog to hide the geometry/sky transition (FUN_00435868). */
-    if (g_introCountdown <= 0xD2 && g_introCountdown >= 0) {
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        R_DisableScissor();
-        R_FlushState();
-        return;
-    }
-
-    /* Menu/title: just clear. The wallpaper is drawn with wave distortion
-     * by RenderWavingMenuBackground (FUN_004c6b50), called later in the render loop.
-     * Binary: RenderBackground (0x435868) does IDirect3DViewport2::Clear only. */
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     R_DisableScissor();

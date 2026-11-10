@@ -46,7 +46,7 @@ void BeginFrame(void);                   /* 0x42299C */
 void UpdateFrameTimers(void);            /* 0x47FDE8 */
 void AnimateVehicleGlow(Player *p);      /* 0x4217F8 */
 void SetViewportFromConfig(int *config); /* 0x4CC0E8 */
-extern void RenderBackground(void);
+extern void D3DAppClearBackBuffer(void);
 extern void RenderLogoQuads(void);
 extern void UpdateFrameTimers(void);
 extern void AdvancePlayerAnimation(int playerIndex);
@@ -62,7 +62,7 @@ extern void R_ClearNoColorKey(int tpage);
 void EnumNetworkSessions(int flag); /* 0x487180 */
 extern void R_FreezeTexture(int tpage);
 /* Forward declarations for render/update functions */
-void RenderBackground(void);                    /* 0x435868 */
+void D3DAppClearBackBuffer(void);              /* 0x435868 */
 void ColorizeTpageHiColor(int r, int g, int b); /* 0x488310 */
 void SetupMenuTexturesD3D(void);                /* 0x438CD8 */
 void FinalizeMenuTexturesD3D(void);             /* 0x438D10 */
@@ -2014,7 +2014,7 @@ int OptionsMenuScreen(void)
         /* Quad path — the binary's D3D branch, kept for the GL backend */
         ProcessTpageStates();
         BeginFrame();
-        RenderBackground();
+        D3DAppClearBackBuffer();
         EndFrame();
 
         BeginFrame();
@@ -2750,7 +2750,7 @@ int LoadSaveScreen(void)
         /* D3D/GL Rendering */
         ProcessTpageStates();                                     /* 0x4901B0 */
         BeginFrame();                                        /* 0x4901B5 */
-        RenderBackground();                                  /* 0x435868 */
+        D3DAppClearBackBuffer();                            /* 0x435868 */
         EndFrame();
 
         /* 0x4901DD `cmp esi, [0x901c44]` / `jle` — esi is 0 for the whole
@@ -3312,7 +3312,7 @@ render:
         /*  background */
         ProcessTpageStates();
         BeginFrame();
-        RenderBackground();
+        D3DAppClearBackBuffer();
         EndFrame();
 
         /* main content */
@@ -3889,7 +3889,7 @@ static int ShowCreditsSlide(int pageIndex)                       /* 0x4DB014 */
         ProcessTpageStates();                                        /* 0x4DB210 */
         BeginFrame();                                           /* 0x4DB215: 0x42299C */
         SetViewportFromConfig(g_viewportArray + 5 * 21);        /* 0x4DB21A: EAX = 0x8FB50C */
-        RenderBackground();                                     /* 0x4DB226: EAX = 1 (ebx) */
+        D3DAppClearBackBuffer();                               /* 0x4DB226: EAX = 1 (ebx) */
         EndFrame();                                             /* 0x4DB22B: 0x422BA0 */
 
         SetViewportFromConfig(g_viewportArray + 4 * 21);        /* 0x4DB230: EAX = 0x8FB4B8 */
@@ -4144,7 +4144,7 @@ static int RunCreditsStep(int step)                              /* 0x4DB2C8 */
         /* Pass 1: background */
         BeginFrame();
         SetViewportFromConfig(g_viewportArray + 5 * 21);
-        RenderBackground();
+        D3DAppClearBackBuffer();
         EndFrame();
 
         /* Pass 2: fade + content */
@@ -4998,7 +4998,7 @@ int NetworkScreen(void)
                     /* Render */
                     ProcessTpageStates();
                     BeginFrame();
-                    RenderBackground();
+                    D3DAppClearBackBuffer();
                     EndFrame();
 
                     if (g_fadeLevel < 0) {
@@ -5813,7 +5813,7 @@ render_frame:
             g_polyCount = 0;
             ProcessTpageStates();                                   /* 0x4323CC */
             BeginFrame();                                      /* 0x42299C */
-            RenderBackground();                                /* 0x435868 */
+            D3DAppClearBackBuffer();                          /* 0x435868 */
 
             /* Lobby contents (character podium, track/mode models, lobby
              * HUD) only render in the actual lobby (state 2).  States 0,
@@ -6695,7 +6695,7 @@ render_frame_re:
             g_polyCount = 0;
             ProcessTpageStates();
             BeginFrame();
-            RenderBackground();
+            D3DAppClearBackBuffer();
             if (ns_lobbyState >= 2) {
                 int charId = (int)(signed short)g_menuPlayer.charId;
                 int nameY = s_netCharModelY[charId] + 0x32;
@@ -7493,7 +7493,7 @@ extern void SetupViewportConfig(void);
 extern void ApplyViewportGeometry(void);   /* mode render height + full rebuild */
 extern int g_glowPrevChar5, g_glowPrevChar7, g_glowPrevChar8; /* 0x4FBE48/4C/50 */
 void platform_pump_events(void);
-void RenderBackground(void);                                     /* 0x435868 */
+void D3DAppClearBackBuffer(void);                               /* 0x435868 */
 void RelocateModelVertices(int *arr, int count, int newBase,
                            int oldBase, int fileBase);           /* 0x421790 */
 void LoadCharacterGouraudTables(void);                           /* 0x476750 */
@@ -7988,11 +7988,7 @@ int ResultsScreen(int screenType)
             g_polyCount = 0;
             ProcessTpageStates();
             BeginFrame();
-
-            /* Wavy tinted background — binary composites via software renderer;
-             * GL port: use RenderBackground which draws the ColorizeTpageHiColor-
-             * tinted g_uiTexPage with sine wobble, matching other menu screens. */
-            RenderBackground();
+            D3DAppClearBackBuffer();                           /* 0x4c80dc */
 
             /* NOTE: the binary's Path-A "3D podium scene" call at 0x4c7e3b
              * (FUN_004671b8) is the *software* renderer's env-map model function.
