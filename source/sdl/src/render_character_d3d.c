@@ -36,6 +36,7 @@ extern void R_DrawPvrStrip(pvr_vertex_t *v, int count);
 extern void DispatchFaceUVAnimation(Player *player);  /* FUN_0047fea0 — 163 bytes */
 extern void UpdateVertexLightingPhase(Player *player); /* FUN_00430ed4 — 282 bytes */
 extern void RelocateModelVertices(int *arr, int count, int newBase, int oldBase, int fileBase);  /* FUN_00421790 */
+extern int g_glowPrevChar5, g_glowPrevChar7, g_glowPrevChar8;    /* 0x4FBE48/4C/50 — animation.c */
 /* Sub-functions for character sprite effects */
 extern void SubmitCharacterSprite(Player *player, int yOffset, int charId);  /* 0x004502E8 */
 extern void RenderItemSprite(Player *player, int modelId, int itemType);     /* 0x0044F9C4 */
@@ -779,7 +780,9 @@ static void AnimateCharacterGlow(Player *player, int *glowState, int modelIdx,
         brightness = 0;
     }
 
-    if (g_ghostDataExists == 0) {
+    /* Halved one frame in three: [0x90207C] is g_raceOrder[3], the 0..2
+     * frame counter stepped at 0x482007-0x482033 — 0x421984. */
+    if (g_raceOrder[3] == 0) {
         /* abs(brightness) / 2 */
         int sign = brightness >> 31;
         brightness = ((brightness ^ sign) - sign) >> 1;
@@ -812,11 +815,14 @@ static void AnimateCharacterGlow(Player *player, int *glowState, int modelIdx,
     *glowState = uvShift;
 }
 
+/* The glow state is the same dword AnimateVehicleGlow (0x4217F8, menus) and
+ * ResultsScreen (0x4c72e8) use. The V shift is applied as new - previous, so
+ * all three must see one value or the flame window drifts off the cone. */
+
 /* FUN_00421968 — 147 bytes — Metal Sonic jet glow */
 static void AnimateMetalSonic(Player *player)
 {
-    static int s_metalSonicState = 0x600000;  /* ROM at 0x4FBE48: init 0x600000 */
-    AnimateCharacterGlow(player, &s_metalSonicState,
+    AnimateCharacterGlow(player, &g_glowPrevChar5,   /* 0x4FBE48 */
                          5,                 /* model 5 (Metal Sonic) */
                          0x30, 4);
 }
@@ -824,8 +830,7 @@ static void AnimateMetalSonic(Player *player)
 /* FUN_004219fc — 147 bytes — Metal Knuckles glow */
 static void AnimateMetalKnuckles(Player *player)
 {
-    static int s_metalKnuxState = 0x600000;   /* ROM at 0x4FBE4C: init 0x600000 */
-    AnimateCharacterGlow(player, &s_metalKnuxState,
+    AnimateCharacterGlow(player, &g_glowPrevChar7,   /* 0x4FBE4C */
                          7,                 /* model 7 (Metal Knuckles) */
                          0x1C, 4);
 }
@@ -833,8 +838,7 @@ static void AnimateMetalKnuckles(Player *player)
 /* FUN_00421a90 — 147 bytes — Egg Robo glow */
 static void AnimateEggRobo(Player *player)
 {
-    static int s_eggRoboState = 0x600000;     /* ROM at 0x4FBE50: init 0x600000 */
-    AnimateCharacterGlow(player, &s_eggRoboState,
+    AnimateCharacterGlow(player, &g_glowPrevChar8,   /* 0x4FBE50 */
                          8,                 /* model 8 (Egg Robo) */
                          0x38, 8);
 }

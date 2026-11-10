@@ -116,7 +116,9 @@ static const int * const s_faceAnimTable[10][4] = {
 
 /* globals */
 
-/* Per-character previous glow state. Shared (non-static): ResultsScreen
+/* Per-character previous glow state. Shared (non-static): the race animators
+ * in render_character_d3d.c (0x421968 / 0x4219FC / 0x421A90) shift from the
+ * same values, and ResultsScreen
  * (0x4c72e8-0x4c7378) reads the same 0x4FBE48/4C/50 globals to reset the
  * glow UV frame on results-screen entry. */
 int g_glowPrevChar5 = 0x600000;  /* 0x004FBE48 */
