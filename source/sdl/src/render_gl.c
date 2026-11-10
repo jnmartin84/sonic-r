@@ -753,8 +753,6 @@ void CleanupD3DTPages(void)                                /* 0x4332ac */
  */
 void RenderBackground(void)
 {
-    extern int g_gameState;
-
     /* Confine glClear to the 4:3 area so sky/menu colors don't
      * leak into the letterbox/pillarbox bars. */
     R_SetScissor(g_glViewportOffsetX, g_glViewportOffsetY,

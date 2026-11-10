@@ -107,7 +107,6 @@ endif
 
 CFLAGS = -I$(SRCDIR) -std=c11 -Os -g -Wall -Wextra -Werror \
          $(SANITIZE) -fno-common \
-         -Wno-void-pointer-to-int-cast -Wno-int-to-void-pointer-cast \
          -Werror=pointer-to-int-cast -Werror=int-to-pointer-cast \
          -DSONICR_SDL -DSONICR_DEBUG_LOG \
          $(PLATFORM_CFLAGS) $(GL_CFLAGS) \
@@ -126,7 +125,6 @@ RELEASE_CFLAGS = -I$(SRCDIR) -std=c11 -Os -g -Wall -Wextra \
                  -fno-common \
                  -Wno-unused-variable -Wno-unused-function \
                  -Wno-unused-parameter \
-                 -Wno-void-pointer-to-int-cast -Wno-int-to-void-pointer-cast \
                  -DSONICR_SDL \
                          $(PLATFORM_CFLAGS) $(GL_CFLAGS) \
                  $(SDL_CFLAGS) $(MATCHMAKER_CFLAGS) $(FLOAT32_CFLAGS) $(SOFT_CFLAGS)
