@@ -96,6 +96,7 @@ static const int s_resultObjTemplate[10] = {
 };
 
 extern int g_optCurrentPage;          /* 0x0068AFCC */
+extern int g_lsPackedCursor;          /* 0x0068AFA0 — Load/Save cursor: low word = column, high word = slot index */
 
 /* =====================================================================
  * Options Menu — globals and ROM data
@@ -2174,9 +2175,6 @@ static const int s_lsColumnX[3] = { 0x2F, 0x7D, 0xCB };  /* 0x502808 */
 #define LS_ROW_HEIGHT 0x30  /* 0x502814 = 48 pixels per slot row */
 #define LS_NUM_SLOTS 10
 
-/* Packed cursor state persisted across screen entries — 0x68afa0 */
-static int s_lsPackedCursor;  /* low word = column, high word = slot index */
-
 /**
  * LoadSaveScreenInit — 0x0048F724 — 424 bytes
  * Loads textures, opens all 10 save files into memory, initializes cursor.
@@ -2211,12 +2209,12 @@ static void LoadSaveScreenInit(void)
     g_fadeState = FADE_IN;                                   /* [0x901C48] = 1 */
 
     /* Restore cursor from packed state; force column to 1 (LOAD) */
-    s_lsPackedCursor = (s_lsPackedCursor & (int)0xFFFF0000) | 1;  /* 0x48F7E4-E9 */
-    s_lsColumn = s_lsPackedCursor & 0xFFFF;                 /* = 1 */
+    g_lsPackedCursor = (g_lsPackedCursor & (int)0xFFFF0000) | 1;  /* 0x48F7E4-E9 */
+    s_lsColumn = g_lsPackedCursor & 0xFFFF;                 /* = 1 */
     s_lsScrollXCur = s_lsColumnX[s_lsColumn];               /* 0x925290 */
     s_lsScrollXTgt = s_lsColumnX[s_lsColumn];               /* 0x925294 */
 
-    s_lsSlotIndex = (s_lsPackedCursor >> 16) & 0xFFFF;      /* 0x9252B4 */
+    s_lsSlotIndex = (g_lsPackedCursor >> 16) & 0xFFFF;      /* 0x9252B4 */
     int scrollY = LS_ROW_HEIGHT * s_lsSlotIndex;
     g_screenResult = 0;                                      /* [0x925418] */
     s_lsActionState = 0;                                     /* [0x9252E0] */
@@ -2679,7 +2677,7 @@ int LoadSaveScreen(void)
                 g_fadeState = 2;                             /* FADE_OUT */
 
                 /* Store cursor for next entry */
-                s_lsPackedCursor = s_lsColumn |
+                g_lsPackedCursor = s_lsColumn |
                                    (s_lsSlotIndex << 16);    /* 0x48FDB4 */
             }
 

@@ -737,7 +737,7 @@ void InitTrackCommon(void)
     /* Shared state block at 0x92528C — 0x472480-0x472490 walks eax 4..0x200
      * storing zero at [eax + 0x925288], covering 0x92528C..0x925488. Every
      * tenant of that range (menu cursor/scroll, track-object animation, the
-     * Factory door and emerald timers, g_prevNumViewports, g_screenResult)
+     * Factory door and emerald timers, g_screenResult)
      * aliases into this array, so one loop clears them all as the binary does.
      *
      * The bound is 128, NOT the array size. The array runs to 151 because the

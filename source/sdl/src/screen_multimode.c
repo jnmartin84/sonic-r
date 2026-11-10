@@ -13,6 +13,7 @@
 /* Multiplayer menu positions and model indices */
 extern int g_multiModePositions[];      /* 0x005025EC */
 extern int g_multiModeModelIndices[];   /* 0x005025F4 */
+extern int g_lastMultiSelection;        /* 0x0068AF80 */
 
 void SetupMenuTexturesD3D(void);
 void LoadMenuBitmaps(void);
@@ -23,8 +24,6 @@ void D3DAppClearBackBuffer(void);
 void RenderFadeOverlay(void);
 void WaitForFrameCap(void);
 void platform_pump_events(void);
-
-static int s_lastMultiSelection;    /* 0x0068AF80 */
 
 /**
  * MultiPlayerModeSelect — 0x0048C270 — 1783 bytes
@@ -60,8 +59,8 @@ int MultiPlayerModeSelect(void)
     g_screenResult = -1;
     g_renderEnabled = 1;
 
-    g_menuCursor = s_lastMultiSelection;
-    g_menuCursorY = g_multiModePositions[s_lastMultiSelection];
+    g_menuCursor = g_lastMultiSelection;
+    g_menuCursorY = g_multiModePositions[g_lastMultiSelection];
     g_menuCursorTargetY = g_menuCursorY;
 
     DWORD idleStart = timeGetTime();
@@ -93,7 +92,7 @@ int MultiPlayerModeSelect(void)
             if ((g_inputBits & 6) != 0 && g_menuCursorTargetY == g_menuCursorY) {
                 PlaySoundEffect(2, 0, 0);
                 g_screenResult = g_menuCursor + 1;
-                s_lastMultiSelection = g_menuCursor;
+                g_lastMultiSelection = g_menuCursor;
                 g_nextScreenId = 7;
                 g_fadeState = FADE_OUT;
             }

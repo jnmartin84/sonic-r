@@ -32,6 +32,21 @@ extern uint32_t g_ringSpawnStorage[], g_splineWaypointStorage[];
 extern char g_polygonStorage[];
 extern char g_joystickSlots[][282];
 
+/* Menu / character-select state seeded by LoadGameState */
+extern int g_charSelectIndex[];         /* 0x0068AF84 */
+extern int g_charSelection[];           /* 0x0068AFEC */
+extern int g_lastMenuSelection;         /* 0x0068AF78 */
+extern int g_lastTimeAttackSelection;   /* 0x0068AF7C */
+extern int g_lastMultiSelection;        /* 0x0068AF80 */
+extern int g_lastCourseSelection;       /* 0x0068AF94 */
+extern int g_lsPackedCursor;            /* 0x0068AFA0 */
+extern int g_rankPagePersist;           /* 0x0068AFA4 */
+extern int g_rankCursorPersist;         /* 0x0068AFA8 */
+extern int g_netSavedButtonByte;        /* 0x0068AFAC */
+extern int g_netSavedCharId;            /* 0x0068AFE0 */
+extern int g_netSavedTrackIdx;          /* 0x0068AFE4 */
+extern int g_netSavedModeIdx;           /* 0x0068AFE8 */
+
 /* Display configuration externs */
 extern int g_dispClipRight;     /* 0x006E9878 */
 extern int g_dispClipBottom;    /* 0x006E987C */
@@ -245,12 +260,43 @@ void LoadGameState(void)
     /* Binary calls 0x4D1040 here — sound buffer offset table init */
     InitSoundOffsetTables();
 
-    g_trackId = TRACK_RESORT_ISLAND;
-    g_raceType = 0;
-    g_raceSubMode = SUBMODE_NORMAL;
-    g_demoMode = DEMO_NONE;
-    ResetDemoCycle();                 /* binary 0x4cda63: g_demoCycleIndex = -1 → attract plays island.dem first */
-    g_ghostDataExists = 0;
+    /* Menu, character-select and replay defaults — 0x4CD99D-0x4CDA7D.
+     * 0x4CDA6B (g_cdAvailable = 0) and the CD calls after this block
+     * (0x4D0C8C drive scan, 0x4D0F4C FindSonicRCD) are not run here: the port
+     * sets CD state in FindSonicRCD, called from the title and results screens. */
+    g_charSelectIndex[1] = 1;               /* 0x4CD99D */
+    g_charSelection[1] = 1;                 /* 0x4CD9A3 */
+    g_prevNumViewports = 1;                 /* 0x4CD9AB */
+    g_superSonicSeed = 0;                   /* 0x4CD9B1 */
+    g_lastCourseSelection = 0;              /* 0x4CD9B7 */
+    g_lastMultiSelection = 0;               /* 0x4CD9BD */
+    g_lastTimeAttackSelection = 0;          /* 0x4CD9C3 */
+    g_lastMenuSelection = 0;                /* 0x4CD9C9 */
+    g_lsPackedCursor = 0;                   /* 0x4CD9CF */
+    g_charSelectIndex[0] = 0;               /* 0x4CD9D5 */
+    g_charSelectIndex[2] = 2;               /* 0x4CD9DB */
+    g_charSelection[0] = 0;                 /* 0x4CD9E0 */
+    g_charSelection[2] = 2;                 /* 0x4CD9E6 */
+    g_rankCursorPersist = 0;                /* 0x4CD9EB */
+    g_rankPagePersist = 0;                  /* 0x4CD9F1 */
+    g_netSavedModeIdx = 0;                  /* 0x4CD9F7 */
+    g_netSavedTrackIdx = 0;                 /* 0x4CD9FD */
+    g_netSavedCharId = 0;                   /* 0x4CDA03 */
+    g_netSavedButtonByte = 0;               /* 0x4CDA09 */
+    g_demoMode = DEMO_NONE;                 /* 0x4CDA0F */
+    g_replayCharIds[0] = 0;                 /* 0x4CDA15 */
+    g_replayCharIds[2] = 2;                 /* 0x4CDA1B */
+    g_nextScreenId = 3;                     /* 0x4CDA2F */
+    g_charSelectIndex[3] = 3;               /* 0x4CDA37 */
+    g_replayCharIds[1] = 1;                 /* 0x4CDA3D */
+    g_replayCharIds[4] = 4;                 /* 0x4CDA43 */
+    g_trackId = TRACK_RESORT_ISLAND;        /* 0x4CDA48 */
+    g_charSelection[3] = 3;                 /* 0x4CDA57 */
+    g_replayCharIds[3] = 3;                 /* 0x4CDA5D */
+    ResetDemoCycle();                       /* 0x4CDA63: g_demoCycleIndex = -1 → attract plays island.dem first */
+    g_ghostDataExists = 0;                  /* 0x4CDA71 */
+    g_raceType = 0;                         /* 0x4CDA77 */
+    g_raceSubMode = SUBMODE_NORMAL;         /* 0x4CDA7D */
     g_weatherType = WEATHER_CLEAR;
     BuildGridUVTable();
     g_raceSpeedMult = 0x1E;

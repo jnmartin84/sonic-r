@@ -18,6 +18,7 @@ extern void WaitForFrameCap(void);
 extern void platform_pump_events(void);
 extern void platform_poll_events(unsigned char *buf, int len);
 extern void StopCD(void);
+extern int g_lastCourseSelection;       /* 0x0068AF94 */
 
 /* GP / multiplayer lobby globals */
 
@@ -71,14 +72,21 @@ int CourseSelectScreen(void)
     ResumeCD();
 #endif
 
+    g_trackId = TRACK_RESORT_ISLAND;    /* 0x48DF74 */
     g_totalFrames = 0;
     g_modelRotation = 0;
     s_previewCamAngle = 0x100;      /* 0x48DFDF: initial camera angle = 256 */
     g_fadeState = FADE_IN;
     g_screenResult = SCREEN_BACK;
     g_renderEnabled = 1;
-    g_menuCursor = 0;
-    g_menuCursorY = s_trackPositionY[0];
+
+    /* 0x48DFB2-0x48DFC0: the remembered course is kept unless it is Radiant
+     * Emerald and that course is not unlocked. */
+    if (g_lastCourseSelection == 4 && g_gpAllTracksFlag == 0) {
+        g_lastCourseSelection = 0;
+    }
+    g_menuCursor = g_lastCourseSelection;                   /* 0x48DFDA */
+    g_menuCursorY = s_trackPositionY[g_menuCursor];         /* 0x48DFF1 */
     g_menuCursorTargetY = g_menuCursorY;
 
     DWORD idleStart = timeGetTime();
@@ -125,6 +133,7 @@ int CourseSelectScreen(void)
                 g_screenResult = g_menuCursor + 1;
                 g_trackId = g_menuCursor + 1;
                 g_fadeState = FADE_OUT;
+                g_lastCourseSelection = g_menuCursor;           /* 0x48E113 */
             }
             /* Back */
             if ((g_inputBits & 1) != 0) {

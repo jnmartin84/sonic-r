@@ -231,6 +231,9 @@ int g_cdAvailable;
 /* Menus */
 int g_lastMenuSelection;
 int g_lastTimeAttackSelection;
+int g_lastMultiSelection;               /* 0x0068AF80 */
+int g_lastCourseSelection;              /* 0x0068AF94 — course cursor kept between visits */
+int g_lsPackedCursor;                   /* 0x0068AFA0 — Load/Save cursor: low word = column, high word = slot index */
 int g_menuAnimY;
 int g_menuIdleStartTime;                /* 0x0068AFB0 */
 int g_menuItemPositions[16] = {
@@ -257,6 +260,7 @@ int g_p4Confirmed;                      /* 0x0068AFC4 */
 /* Character Select — per-player last selection (stride 4) */
 int g_charSelectIndex[4];               /* 0x0068AF84 */
 int g_charSelection[4];                 /* 0x0068AFEC */
+int g_prevNumViewports;                 /* 0x0068AF74 — g_numViewports at the last character select */
 
 /* The 0x92528C state block — 151 ints (0x92528C..0x9254E4). Menu screens,
  * track-object animation, device enumeration and screen plumbing all alias

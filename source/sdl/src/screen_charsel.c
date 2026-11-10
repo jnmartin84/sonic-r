@@ -235,6 +235,13 @@ int CharacterSelectScreen(void)
     int prevVP = g_prevNumViewports;
     g_totalFrames = 0;
     g_fadeState = FADE_IN;
+
+    /* 0x48cb6a-0x48cb8c: every racer's charId starts as its slot number */
+    Player *pb = (Player *)g_playerBase;
+    for (int p = 0; p < MAX_PLAYERS; p++) {
+        pb[p].charId = (short)p;
+    }
+
     g_menuExtraY = g_screenHeight + g_screenScale * -0x3C;
     g_modelRotation = 0;
 
@@ -272,7 +279,6 @@ int CharacterSelectScreen(void)
      * Sets animId=2 (ANIM_STILL), then directly looks up the animation table
      * to get the frame stream pointer and first frame index.
      * Binary does NOT call TickPlayerAnimation on charsel — static pose only. */
-    Player *pb = (Player *)g_playerBase;
     for (int p = 0; p < g_numViewports; p++) {
         int charId = g_charSelection[p];
         pb[p].charId = (short)charId;
@@ -384,12 +390,7 @@ int CharacterSelectScreen(void)
 
             /* All confirmed → finalize */
             if (g_p1Confirmed && g_p2Confirmed && g_p3Confirmed && g_p4Confirmed) {
-                /* Set player character IDs for the race */
                 Player *pb = (Player *)g_playerBase;
-                for (int p = 0; p < g_numViewports; p++) {
-                    g_charSelection[p] = (int)pb[p].charId;
-                    g_charSelectIndex[p] = VP_CHAR(p);
-                }
 
                 /* AI opponent assignment — binary 0x48CFE1-0x48D0C4.
                  *
@@ -468,6 +469,15 @@ int CharacterSelectScreen(void)
                             aiIdx++;
                         }
                     }
+                }
+
+                /* 0x48d0c6-0x48d123: remember all four cursors and charIds for
+                 * the next visit, taken after the AI fill. */
+                for (int p = 0; p < 4; p++) {
+                    g_charSelectIndex[p] = VP_CHAR(p);
+                }
+                for (int p = 0; p < 4; p++) {
+                    g_charSelection[p] = (int)pb[p].charId;
                 }
 
                 g_screenResult = SCREEN_OK;

@@ -752,8 +752,7 @@ extern int          g_stateBlock92528C[151]; /* 0x0092528C */
 #define g_animState338      g_stateBlock92528C[43]   /* 0x925338 */
 #define g_animState33C      g_stateBlock92528C[44]   /* 0x92533C */
 
-/* [59] and [99] — screen plumbing */
-#define g_prevNumViewports  g_stateBlock92528C[59]   /* 0x925378 — numViewports saved across screens */
+/* [99] — screen plumbing */
 #define g_screenResult      g_stateBlock92528C[99]   /* 0x925418 — value every screen function returns */
 
 /* [128]-[150] 0x92548C-0x9254E4 — above the track-init clear.
@@ -964,6 +963,7 @@ extern int g_replayLapCount;          /* 0x008fb8d4 */
 extern int g_replayPlacement;          /* 0x008fb8d8 */
 extern int g_charUnlockSource[];          /* 0x006d981c */
 extern int g_superSonicSeed;          /* 0x0068af98 */
+extern int g_prevNumViewports;          /* 0x0068af74 */
 extern int g_dpLobbyObject;          /* 0x0068ac6c */
 extern int g_splashPrevState;          /* 0x0068af6c */
 extern int g_nextScreenId;          /* 0x0068af9c */
