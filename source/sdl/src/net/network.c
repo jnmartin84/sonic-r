@@ -305,12 +305,40 @@ static int s_clientKeyframeCountdown;
 
 /* Protocol version, carried in header bytes 10-11 of NET_MSG_SNAPSHOT and
  * NET_MSG_CLIENT_INPUT. The v1.0 release wrote those bytes as zero and never
- * read them, so a peer reporting 0 is v1.0. The wire format itself is
- * unchanged at version 1; the marker exists so the next change can be
- * detected instead of silently mis-decoded. */
-#define NET_PROTOCOL_VERSION 1
+ * read them, so a peer reporting 0 is v1.0. Version 1 changed nothing on the
+ * wire. Version 2 adds the end-of-race agreement below: clients announce their
+ * end with 0xFFF0003F and the host marks its final result. Peers below 2 take
+ * no part in it, and nobody waits for them. */
+#define NET_PROTOCOL_VERSION 2
 static unsigned short s_peerProtoVersion[MAX_PLAYERS];
 static unsigned char  s_peerProtoSeen[MAX_PLAYERS];
+
+/* End-of-race agreement (#34). The EXE's rule is that the host referees: once
+ * its race ends it broadcasts every player's laps, lap times and position
+ * (0xFFF0003F) and a client still racing adopts that and ends too. On its own
+ * that hands out results the host decided without waiting for anyone, from a
+ * view in which a remote finish counts only once its packet arrives.
+ *
+ * So each machine freezes its own laps, lap times and progress at the moment
+ * its race ends; clients send them to the host in a 0xFFF0003F of their own;
+ * the host waits for every client that speaks version 2 (or until
+ * NET_END_HOST_WAIT_MS), ranks everyone from those final states, and marks the
+ * 0xFFF0003F that carries the result with NET_END_FINAL_MARK in its pad word.
+ * Clients keep the race loop running after their own end until that arrives
+ * (or NET_END_CLIENT_WAIT_MS), then show exactly what the host showed. */
+#define NET_END_FINAL_MARK      0x0001  /* 0xFFF0003F +0x42, a word v1.0 never reads */
+#define NET_END_HOST_WAIT_MS    3000
+#define NET_END_CLIENT_WAIT_MS  5000
+#define NET_END_FINAL_REPEATS   10      /* FINAL broadcasts before the host leaves */
+static int      s_endFrozen;            /* this machine's race has ended */
+static short    s_endLaps;              /* ...and its own player's state then */
+static int      s_endLapTime[3];
+static int      s_endProgress;
+static DWORD    s_endTimeMs;
+static unsigned s_hostEndedMask;        /* host: clients that announced their end */
+static int      s_finalReady;           /* host: result ranked and being sent */
+static int      s_finalSendsLeft;
+static int      s_finalReceived;        /* client: host's result adopted */
 
 void EnumNetworkSessions(int flag);   /* CHAR_CHANGE broadcast, defined below */
 
@@ -376,6 +404,36 @@ static void NetSnapshotReset(void)
     memset(s_peerProtoSeen, 0, sizeof(s_peerProtoSeen));
     memset(s_peerProtoVersion, 0, sizeof(s_peerProtoVersion));
     NetInterpReset();
+    s_endFrozen = 0;
+    s_endTimeMs = 0;
+    s_hostEndedMask = 0;
+    s_finalReady = 0;
+    s_finalSendsLeft = 0;
+    s_finalReceived = 0;
+}
+
+/* Record this machine's own player as it stood when the race ended. Called
+ * once per race, as soon as g_raceFinished is seen non-zero and before any
+ * result received from the host can overwrite the local player's entry. */
+static void net_end_freeze(void)
+{
+    if (s_endFrozen) return;
+    const Player *me = &g_playerBase[g_localPlayerIndex];
+    s_endLaps = me->lapsCompleted;
+    s_endLapTime[0] = me->lap1Time;
+    s_endLapTime[1] = me->lap2Time;
+    s_endLapTime[2] = me->lap3Time;
+    s_endProgress = me->trackProgress;
+    s_endTimeMs = timeGetTime();
+    s_endFrozen = 1;
+}
+
+/* The host has a final result, or this client has adopted one. Race positions
+ * must not be re-sorted after that. */
+int NetRaceResultFinal(void)
+{
+    if (g_netSessionActive == 0) return 0;
+    return net_is_host() ? s_finalReady : s_finalReceived;
 }
 
 /* Per-player state within a snapshot — matches 0xFFF0002F layout minus 4-byte header */
@@ -636,9 +694,14 @@ static void net_apply_snapshot(const char *buf, int len)
 
         {
             short prevLaps = pl->lapsCompleted;
+            /* racePosition rides along in the delta, but it is the host's
+             * view; during the race this machine's own sort decides it, and
+             * at the end the host's FINAL result does (#34). */
+            short keepPos = pl->racePosition;
             consumed = net_delta_decode(&s_deltaRecv[playerIdx],
                                         (const unsigned char *)buf + offset,
                                         len - offset, is_keyframe, pl);
+            pl->racePosition = keepPos;
             if (consumed == 0) break;
             if (pl->lapsCompleted == 3 && prevLaps < 3) {
                 int counter = g_finishOrderCounter;
@@ -904,7 +967,14 @@ void SendNetworkHostData(void)
  */
 void UpdateNetworkClient(void)
 {
-    if (g_raceFinished != 0) return;
+    if (g_raceFinished != 0) {
+        /* Race over for this machine: stop sending state, but keep receiving
+         * while the host's final result is still due (#34). */
+        if (NetRaceEndPending()) {
+            ApplyNetworkPlayerState();
+        }
+        return;
+    }
 
     ApplyNetworkPlayerState();
 
@@ -1219,6 +1289,174 @@ void ProcessNetworkGameData(void)
     /* Binary: ResetEvent(g_netDataEvent) — not needed on SDL */
 }
 
+/* End-of-race packet 0xFFF0003F, 68 bytes (0x44) — 0x487FFC-0x48808A:
+ *   +0x00 int            header       = 0xFFF0003F
+ *   +0x04 int            lapTimes[4][3] — lap1Time/lap2Time/lap3Time per player
+ *   +0x34 unsigned char  [4] lapsCompleted per player
+ *   +0x38 unsigned char  [4] racePosition per player
+ *   +0x3C unsigned char  [4] collisionCount per player
+ *   +0x40 unsigned short g_raceFinished
+ *   +0x42 unsigned short marks — NET_END_FINAL_MARK on the host's final result
+ * The EXE stores racePosition at +0x34 and lapsCompleted at +0x38
+ * (0x48802F-0x48803F). This port's sender and receiver both use the order
+ * above, and v1.0 shipped it, so it stays — every build agrees with every
+ * other one.
+ *
+ * The local player's entry comes from the state frozen at its race end; the
+ * others are this machine's current view of them. The host only takes a
+ * client's own entry out of that client's packet. */
+static void net_send_end_of_race(int final)
+{
+    char buf[0x44];
+    int i;
+
+    memset(buf, 0, sizeof(buf));
+    wl32(buf + 0x00, (uint32_t)0xFFF0003Fu);
+
+    for (i = 0; i < g_numViewports && i < NET_MAX_PLAYERS; i++) {   /* [0x6E9910] */
+        const Player *pl = &g_playerBase[i];
+        int laps = pl->lapsCompleted;
+        int t1 = pl->lap1Time, t2 = pl->lap2Time, t3 = pl->lap3Time;
+        if (i == g_localPlayerIndex && s_endFrozen) {
+            laps = s_endLaps;
+            t1 = s_endLapTime[0];
+            t2 = s_endLapTime[1];
+            t3 = s_endLapTime[2];
+        }
+        buf[0x34 + i] = (unsigned char)laps;
+        buf[0x38 + i] = (unsigned char)pl->racePosition;
+        buf[0x3C + i] = (unsigned char)pl->collisionCount;
+        wl32(buf + 0x04 + i * 12 + 0, (uint32_t)t1);
+        wl32(buf + 0x04 + i * 12 + 4, (uint32_t)t2);
+        wl32(buf + 0x04 + i * 12 + 8, (uint32_t)t3);
+    }
+
+    wl16(buf + 0x40, (uint16_t)g_raceFinished);             /* [0x901C88] word */
+    wl16(buf + 0x42, final ? NET_END_FINAL_MARK : 0);
+    UpdateNetworkSync(buf, 0x44);
+}
+
+/* Does player a finish ahead of player b? Everyone who completed the race
+ * comes first, in order of total race time — each player's lap times are
+ * measured on their own machine from their own start, so this does not
+ * depend on when the finish was heard about. Then everyone else, furthest
+ * round the track first. Ties go to the lower slot so every run of this gives
+ * the same order. */
+static int net_end_ranks_before(int a, int b, const unsigned int *progress)
+{
+    const Player *pa = &g_playerBase[a];
+    const Player *pb = &g_playerBase[b];
+    int finA = (pa->lapsCompleted >= 3);
+    int finB = (pb->lapsCompleted >= 3);
+
+    if (finA != finB) {
+        return finA;
+    }
+    if (finA) {
+        unsigned int tA = (unsigned int)(pa->lap1Time & 0xFFFFFF)
+                        + (unsigned int)(pa->lap2Time & 0xFFFFFF)
+                        + (unsigned int)(pa->lap3Time & 0xFFFFFF);
+        unsigned int tB = (unsigned int)(pb->lap1Time & 0xFFFFFF)
+                        + (unsigned int)(pb->lap2Time & 0xFFFFFF)
+                        + (unsigned int)(pb->lap3Time & 0xFFFFFF);
+        if (tA != tB) {
+            return tA < tB;
+        }
+    }
+    else if (progress[a] != progress[b]) {
+        return progress[a] > progress[b];
+    }
+    return a < b;
+}
+
+/* Host: rank every player from their final states and start sending the
+ * result. Clients that announced their end supplied their own laps and lap
+ * times; for any that did not, this is the last state received from them. */
+static void net_host_finalize(void)
+{
+    int n = (g_numViewports < NET_MAX_PLAYERS) ? g_numViewports : NET_MAX_PLAYERS;
+    int order[NET_MAX_PLAYERS];
+    unsigned int progress[NET_MAX_PLAYERS];
+    int i, j;
+
+    {
+        Player *me = &g_playerBase[g_localPlayerIndex];
+        me->lapsCompleted = s_endLaps;
+        me->lap1Time = s_endLapTime[0];
+        me->lap2Time = s_endLapTime[1];
+        me->lap3Time = s_endLapTime[2];
+    }
+
+    for (i = 0; i < n; i++) {
+        order[i] = i;
+        progress[i] = (i == g_localPlayerIndex)
+                    ? (unsigned int)s_endProgress
+                    : (unsigned int)g_playerBase[i].trackProgress;
+    }
+    for (i = 1; i < n; i++) {                   /* insertion sort, n <= 4 */
+        int k = order[i];
+        for (j = i - 1; j >= 0 && net_end_ranks_before(k, order[j], progress); j--) {
+            order[j + 1] = order[j];
+        }
+        order[j + 1] = k;
+    }
+    for (i = 0; i < n; i++) {
+        g_playerBase[order[i]].racePosition = (short)(i + 1);
+    }
+
+    s_finalReady = 1;
+    s_finalSendsLeft = NET_END_FINAL_REPEATS;
+    DebugLog("Net: final result (clients announced 0x%x):", s_hostEndedMask);
+    for (i = 0; i < n; i++) {
+        const Player *p = &g_playerBase[order[i]];
+        DebugLog(" %d:slot%d laps=%d", i + 1, order[i], (int)p->lapsCompleted);
+    }
+    DebugLog("\n");
+}
+
+/* Keep the race loop running after this machine's race has ended (#34):
+ * the host until it has every version-2 client's final state and has sent the
+ * result, a client until that result has arrived. Bounded by the timeouts. */
+int NetRaceEndPending(void)
+{
+    if (g_netSessionActive == 0 || g_raceFinished == 0) {
+        return 0;
+    }
+    if (!s_endFrozen) {
+        return 1;           /* frozen at the end of this frame (SendNetworkClientData) */
+    }
+
+    DWORD waited = timeGetTime() - s_endTimeMs;
+
+    if (net_is_host()) {
+        if (!s_finalReady) {
+            int i, allIn = 1;
+            for (i = 0; i < g_numViewports && i < NET_MAX_PLAYERS; i++) {
+                if (i == g_localPlayerIndex) continue;
+                if (g_playerBase[i].netActive == 0) continue;
+                if (!s_peerProtoSeen[i] || s_peerProtoVersion[i] < 2) continue;
+                if (!(s_hostEndedMask & (1u << i))) {
+                    allIn = 0;
+                    break;
+                }
+            }
+            if (!allIn && waited < NET_END_HOST_WAIT_MS) {
+                return 1;
+            }
+            net_host_finalize();
+        }
+        return s_finalSendsLeft > 0;
+    }
+
+    if (s_finalReceived) {
+        return 0;
+    }
+    if (!s_peerProtoSeen[0] || s_peerProtoVersion[0] < 2) {
+        return 0;           /* an older host never sends a final result */
+    }
+    return waited < NET_END_CLIENT_WAIT_MS;
+}
+
 /**
  * SendNetworkClientData — 0x00487F7C
  * Keepalive (Section 1) + camera sync (Section 2) only.
@@ -1227,9 +1465,6 @@ void ProcessNetworkGameData(void)
  */
 void SendNetworkClientData(void)
 {
-    Player *pl;   /* player struct pointer */
-    int i;
-
     /* ================================================================
      * Section 1: Keepalive ping — every 10 frames during intro
      * Packet: 0xFFF0004F, 12 bytes
@@ -1251,10 +1486,24 @@ void SendNetworkClientData(void)
         }
     }
 
+    /* The race is over for this machine — keep its own final state before
+     * anything else can change it (#34). */
+    if (g_raceFinished != 0) {
+        net_end_freeze();
+    }
+
     /* ================================================================
      * Section 2+3: Require g_netGameStarted
      * ================================================================ */
-    if (g_netGameStarted == 0) return;                      /* [0x68ACE4] */
+    if (g_netGameStarted == 0) {                            /* [0x68ACE4] */
+        /* Client: the EXE sends nothing more here. Version 2 clients announce
+         * their end to the host with the same 0xFFF0003F, which the host
+         * waits for before ranking (#34); older hosts ignore it. */
+        if (g_raceFinished != 0 && g_postRaceCameraMode == 0) {
+            net_send_end_of_race(0);
+        }
+        return;
+    }
 
     /* ================================================================
      * Section 2: Camera sync — race finished AND post-race camera == 0
@@ -1262,34 +1511,10 @@ void SendNetworkClientData(void)
      * Per-player camera position (3 ints) + state bytes + raceFinished
      * ================================================================ */
     if (g_raceFinished != 0 && g_postRaceCameraMode == 0) { /* [0x901C88], [0x901C84] */
-        /* Camera sync packet, 68 bytes (0x44):
-         *   +0x00 int            header              = 0xFFF0003F
-         *   +0x04 int            perPlayerPos[4 * 3] — 3 ints per player (0x50,0x54,0x58)
-         *   +0x34 unsigned char  racePos[4]          — racePosition byte per player (0x5C)
-         *   +0x38 unsigned char  lapsDone[4]         — lapsCompleted byte per player (0x5E)
-         *   +0x3C unsigned char  collCount[4]        — collisionCount byte per player (0x1F4)
-         *   +0x40 unsigned short raceFinished        — g_raceFinished
-         *   +0x42 unsigned short _pad                = 0 */
-        char _cambuf[0x44];
-        memset(_cambuf, 0, sizeof(_cambuf));
-        wl32(_cambuf + 0x00, (uint32_t)0xFFF0003Fu);
-
-        if (g_numViewports > 0) {
-            for (i = 0; i < g_numViewports; i++) {          /* [0x6E9910] */
-                pl = &g_playerBase[i];
-                _cambuf[0x34 + i] = (unsigned char)pl->lapsCompleted;  /* racePos — 0x5E */
-                _cambuf[0x38 + i] = (unsigned char)pl->racePosition;   /* lapsDone — 0x5C */
-                _cambuf[0x3C + i] = (unsigned char)pl->collisionCount; /* collCount — 0x1F4 */
-                /* 3 ints of position/camera data */
-                wl32(_cambuf + 0x04 + i * 12 + 0, (uint32_t)pl->lap1Time); /* 0x50 */
-                wl32(_cambuf + 0x04 + i * 12 + 4, (uint32_t)pl->lap2Time); /* 0x54 */
-                wl32(_cambuf + 0x04 + i * 12 + 8, (uint32_t)pl->lap3Time); /* 0x58 */
-            }
+        net_send_end_of_race(s_finalReady);
+        if (s_finalReady && s_finalSendsLeft > 0) {
+            s_finalSendsLeft--;
         }
-
-        wl16(_cambuf + 0x40, (uint16_t)g_raceFinished); /* [0x901C88] word */
-        /* ebx=0x44, edx=&camPkt, eax=DPID; call UpdateNetworkSync */
-        UpdateNetworkSync(_cambuf, 0x44);
         return;
     }
 
@@ -1860,13 +2085,19 @@ void ApplyNetworkPlayerState(void)
                 s_hostSlotLastRecvMs[playerIdx] = timeGetTime();
                 net_note_peer_version((int)playerIdx, rl16u(buf + 10));
 #if NET_PEER_AUTHORITATIVE
-                if (len > 12) {
+                /* A client that has announced its end of race has sent its
+                 * final state; a late delta must not replace it (#34). */
+                if (len > 12 && !(s_hostEndedMask & (1u << playerIdx))) {
                     Player *cpl = &g_playerBase[playerIdx];
                     short prevLaps = cpl->lapsCompleted;
                     int is_kf = (buf[9] & 1);
+                    /* The client's racePosition is its own view; the host's
+                     * sort decides positions here (#34). */
+                    short keepPos = cpl->racePosition;
                     net_delta_decode(&s_deltaRecv[playerIdx],
                                      (const unsigned char *)buf + 12,
                                      len - 12, is_kf, cpl);
+                    cpl->racePosition = keepPos;
                     if (cpl->lapsCompleted == 3 && prevLaps < 3) {
                         int counter = g_finishOrderCounter;
                         cpl->trackProgress = (int)(0xFFFFFFFF - (unsigned int)counter);
@@ -1875,6 +2106,24 @@ void ApplyNetworkPlayerState(void)
                     NetInterpRecord((int)playerIdx);
                 }
 #endif
+            }
+            continue;
+        }
+
+        /* ---- End of race announced by a client (host; version 2+) — #34 ----
+         * Only the sender's own entry is taken: laps and lap times as they
+         * stood when its race ended. */
+        if (header == 0xFFF0003Fu && len >= 0x44 && net_is_host()) {
+            if (from_slot >= 1 && from_slot < NET_MAX_PLAYERS
+                && from_slot < g_numViewports
+                && g_playerBase[from_slot].netActive != 0) {
+                Player *cpl = &g_playerBase[from_slot];
+                cpl->lapsCompleted = (short)*(unsigned char *)(buf + 0x34 + from_slot);
+                cpl->lap1Time = rl32s(buf + 0x04 + from_slot * 12 + 0);
+                cpl->lap2Time = rl32s(buf + 0x04 + from_slot * 12 + 4);
+                cpl->lap3Time = rl32s(buf + 0x04 + from_slot * 12 + 8);
+                s_hostEndedMask |= 1u << from_slot;
+                s_hostSlotLastRecvMs[from_slot] = timeGetTime();
             }
             continue;
         }
@@ -1923,40 +2172,54 @@ void ApplyNetworkPlayerState(void)
                  * Layout: header(4) + perPlayerPos[4*3](48) + racePos[4](4)
                  *       + lapsDone[4](4) + collCount[4](4) + raceFinished(2) + pad(2) */
                 int savedRaceFinished = g_raceFinished;
+                int isFinal = (rl16u(buf + 0x42) & NET_END_FINAL_MARK) != 0;
 
-                if (g_numViewports > 0) {
-                    for (i = 0; i < g_numViewports; i++) {
-                        Player *pl = &g_playerBase[i];
+                /* (#34) While this machine is still racing, the host's result
+                 * ends the race here, as in the EXE. Once it has ended, only
+                 * the host's FINAL result is taken (the EXE stopped listening
+                 * at that point). Freeze the local player first, so this
+                 * client's own announcement carries its own state rather than
+                 * the host's view of it. */
+                if (!s_endFrozen || isFinal) {
+                    net_end_freeze();
 
-                        /* racePosition (byte → word) at pkt+0x34 */
-                        pl->lapsCompleted =
-                            (short)*(unsigned char *)(buf + 0x34 + i);
-                        /* lapsCompleted (byte → word) at pkt+0x38 */
-                        pl->racePosition =
-                            (short)*(unsigned char *)(buf + 0x38 + i);
-                        /* collisionCount (byte → int) at pkt+0x3C */
-                        pl->collisionCount =
-                            (int)*(unsigned char *)(buf + 0x3C + i);
+                    if (g_numViewports > 0) {
+                        for (i = 0; i < g_numViewports; i++) {
+                            Player *pl = &g_playerBase[i];
 
-                        /* 3 ints of position data at pkt+0x04, stride 12 per player */
-                        pl->lap1Time = rl32s(buf + 0x04 + i * 12 + 0);
-                        pl->lap2Time = rl32s(buf + 0x04 + i * 12 + 4);
-                        pl->lap3Time = rl32s(buf + 0x04 + i * 12 + 8);
+                            /* lapsCompleted (byte → word) at pkt+0x34 */
+                            pl->lapsCompleted =
+                                (short)*(unsigned char *)(buf + 0x34 + i);
+                            /* racePosition (byte → word) at pkt+0x38 */
+                            pl->racePosition =
+                                (short)*(unsigned char *)(buf + 0x38 + i);
+                            /* collisionCount (byte → int) at pkt+0x3C */
+                            pl->collisionCount =
+                                (int)*(unsigned char *)(buf + 0x3C + i);
+
+                            /* 3 ints of lap times at pkt+0x04, stride 12 per player */
+                            pl->lap1Time = rl32s(buf + 0x04 + i * 12 + 0);
+                            pl->lap2Time = rl32s(buf + 0x04 + i * 12 + 4);
+                            pl->lap3Time = rl32s(buf + 0x04 + i * 12 + 8);
+                        }
+                    }
+
+                    /* Update g_raceFinished — binary: sar eax, 0x10 on word at pkt+0x40 */
+                    {
+                        int tmp = rl32s(buf + 0x3E);
+                        g_raceFinished = tmp >> 16;
+                    }
+
+                    /* If race wasn't finished before, init end-game fade — binary 0x4D9C73 */
+                    if (savedRaceFinished == 0) {
+                        g_fadeSpeed = 0x10;  /* 0x00901C4C */
+                        g_fadeState = 2;     /* 0x00901C48 — FADE_OUT */
+                    }
+
+                    if (isFinal) {
+                        s_finalReceived = 1;
                     }
                 }
-
-                /* Update g_raceFinished — binary: sar eax, 0x10 on word at pkt+0x40 */
-                {
-                    int tmp = rl32s(buf + 0x3E);
-                    g_raceFinished = tmp >> 16;
-                }
-
-                /* If race wasn't finished before, init end-game fade — binary 0x4D9C73 */
-                if (savedRaceFinished == 0) {
-                    g_fadeSpeed = 0x10;  /* 0x00901C4C */
-                    g_fadeState = 2;     /* 0x00901C48 — FADE_OUT */
-                }
-
             }
             else if (header == 0xFFF0004Fu && len >= 12) {
                 /* Keepalive — binary 0x4D9C98 */

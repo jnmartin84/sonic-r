@@ -1291,7 +1291,10 @@ race_start:
 
     /* Race loop */
 
-    while ((g_raceFinished == 0 || g_fadeState != FADE_VISIBLE) && (int)g_raceFinished < 5) {
+    /* Network races also stay in the loop, on the faded-out screen, until the
+     * agreed result is in (NetRaceEndPending, #34). */
+    while ((g_raceFinished == 0 || g_fadeState != FADE_VISIBLE || NetRaceEndPending())
+           && (int)g_raceFinished < 5) {
         /* PeekMessageA — SDL: pump events.
          * platform_pump_events updates s_keystate via HandleSDLEvent.
          * Copy to g_diKeyboardState so the game's input system sees the keys. */

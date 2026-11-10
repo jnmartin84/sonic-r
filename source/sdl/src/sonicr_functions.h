@@ -237,6 +237,8 @@ void SavePadTypesImpl(void);                            /* 0x00477D54 */
 void UpdateNetworkHost(void);                           /* 0x00487CE8 */
 void SendNetworkHostData(void);                         /* 0x00487D64 */
 int  net_should_run_physics(int playerIdx);
+int  NetRaceEndPending(void);    /* port (#34): race over, but the agreed result is still due */
+int  NetRaceResultFinal(void);   /* port (#34): standings are the agreed result; don't re-sort */
 void UpdateNetworkClient(void);                         /* 0x00487EC0 */
 void SendNetworkClientData(void);                       /* 0x00487F7C */
 void UpdateNetworkSync(const void *data, int len);      /* 0x00487644 */

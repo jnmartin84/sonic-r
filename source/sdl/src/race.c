@@ -33,6 +33,11 @@ void ComputeRacePositions(int playerIdx)
         return;
     }
 
+    /* Port (#34): a network race's standings, once agreed, are final. */
+    if (NetRaceResultFinal()) {
+        return;
+    }
+
     if (g_playerBase == NULL || g_splineWaypoints == NULL) {
         return;
     }
