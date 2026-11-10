@@ -1,16 +1,18 @@
 /**
- * gamepad_buttons.h — Button INDICES of the SDL_GameController layout.
+ * gamepad_buttons.h — Button INDICES of the SDL_GameController layout, and the
+ * per-pad binding storage those indices select.
  *
  * Distinct from pad_bits.h, and the two are easy to confuse: pad_bits.h names
  * the BITS of the 16-bit gameplay input word, this names the button-index space
- * those bits are looked up BY. The pairing is
+ * those bits are looked up BY. Each pad has one binding per button index:
  *
- *     pad bits = g_joystickConfigWords[button index]
+ *     index <  JOY_SLOT_CFG_WORDS  g_joystickSlots[slot][0x104 + index * 2]
+ *     index >= JOY_SLOT_CFG_WORDS  g_joystickSlotCfgExt[slot][index - JOY_SLOT_CFG_WORDS]
  *
- * or, for indices below JOY_SLOT_CFG_WORDS, the per-slot copy at
- * g_joystickSlots[slot][0x104 + index * 2] that the remap UI writes.
+ * The remap UI writes both; g_joystickConfigWords[index] holds the defaults
+ * they are seeded from.
  *
- * Values are the SDL_CONTROLLER_BUTTON_* ordinals, restated here as plain
+ * Values 0..14 are the SDL_CONTROLLER_BUTTON_* ordinals, restated here as plain
  * integers so init.c can lay out the defaults without pulling in SDL.h.
  * platform_sdl.c static_asserts them against the real enum, so if SDL ever
  * renumbers, the build breaks instead of the mapping silently shifting.
@@ -35,30 +37,42 @@
 #define GCBTN_DPAD_LEFT      13
 #define GCBTN_DPAD_RIGHT     14
 
-/* SDL's own enum continues past the d-pad with MISC1, four paddles and a
- * touchpad click. This port does not expose those — nothing in Sonic R wants a
- * paddle — so index 15 onward is ours to define, and the two rear triggers live
- * there. SDL reports triggers as analog AXES with no button index of their own;
- * the poller thresholds them into these indices so they carry ordinary bindings
- * like any button. Ending the borrowed range at the d-pad also keeps these
- * indices stable across SDL versions, which kept adding to the tail. */
+/* From 15 on the indices are ours, fixed, and translated to SDL explicitly in
+ * platform_sdl.c. SDL's own enum carries on past the d-pad too, but has grown
+ * across releases, and saved bindings must not shift with the SDL version.
+ *
+ * SDL reports the triggers as analog AXES with no button index of their own;
+ * the poller thresholds them into these indices so they bind like any button.
+ * The rest are SDL buttons that only some pads have. */
 #define GCBTN_TRIGGER_LEFT   15
 #define GCBTN_TRIGGER_RIGHT  16
-#define GC_BUTTON_COUNT      17
+#define GCBTN_MISC1          17     /* Switch capture, Xbox Series share, PS5 mic */
+#define GCBTN_PADDLE1        18     /* Xbox Elite back paddles */
+#define GCBTN_PADDLE2        19
+#define GCBTN_PADDLE3        20
+#define GCBTN_PADDLE4        21
+#define GCBTN_TOUCHPAD       22     /* PS4 / PS5 touchpad click */
+#define GC_BUTTON_COUNT      23
 
-/* Per-slot binding capacity. g_joystickSlots[slot] is 0x11A bytes: device name
- * through 0x103, then TEN binding shorts at 0x104..0x117, then the button count
- * at 0x118. Ten is therefore a hard ceiling on per-pad bindings — indices at or
- * above it fall back to the shared g_joystickConfigWords[] and so are identical
- * for all four players. Raising it would change the on-disk JOYSTICK.INF layout
- * and the Dreamcast's VMU SONICR_PAD blob with it.
- *
- * It doubles as the remap UI's scan bound (published via
- * g_joystickDeviceFlags[] → slot[0x118] → ScanKeyRemap): a button the commit
- * cannot store must not be capturable, or it consumes one of the six action
- * prompts and binds nothing. Keeping the bound at ten also keeps ScanKeyRemap's
- * writes inside its 16-entry g_optKeyRemapResult / s_remapMappedFlag arrays,
- * which GC_BUTTON_COUNT on its own would overrun. */
+/* Buttons per pad. This is the binary's stride for g_keyPressState (0x675B0C,
+ * 80 bytes per slot — PollAllInputDevices 0x476BB1), so it is also the most a
+ * raw device may report and the remap UI may scan. */
+#define JOY_MAX_BUTTONS      80
+
+/* Bindings held in the original slot. g_joystickSlots[slot] is 0x11A bytes, as
+ * in the binary: device name through 0x103, TEN binding shorts at
+ * 0x104..0x117, then the button count at 0x118. That block is what
+ * JOYSTICK.INF has always stored, and the Dreamcast's VMU SONICR_PAD with it. */
 #define JOY_SLOT_CFG_WORDS   10
+
+/* Bindings for indices JOY_SLOT_CFG_WORDS and up, which the original slot has
+ * no room for. A port addition: g_joystickSlotCfgExt[4][JOY_SLOT_EXT_WORDS].
+ * On SDL builds it is saved after the four original slots in JOYSTICK.INF,
+ * behind JOY_EXT_TAG, so a file without it (or the original game reading one
+ * with it) still sees exactly the 4 x 0x11A bytes it expects. The Dreamcast
+ * pad has 7 buttons, all inside the original slot, so its VMU save is
+ * unchanged. */
+#define JOY_SLOT_EXT_WORDS   (JOY_MAX_BUTTONS - JOY_SLOT_CFG_WORDS)
+#define JOY_EXT_TAG          "SRX1"
 
 #endif /* GAMEPAD_BUTTONS_H */

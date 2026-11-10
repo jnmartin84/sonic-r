@@ -575,6 +575,21 @@ void LoadJoystickConfig(void)
         for (int s = 0; s < 4; s++) {
             bswap16_arr(g_joystickConfig + s * 0x11a + 0x104, 11);
         }
+#ifndef SONICR_DC
+        /* Port: each pad's bindings past its slot's ten, written after the four
+         * slots by SavePadTypesImpl. Without the tag (a file from the original
+         * game, or one saved before the bindings existed) they keep the
+         * defaults InitJoystickConfig gave them. */
+        char tag[4];
+        short ext[4][JOY_SLOT_EXT_WORDS];
+        if (fRead(tag, 1, 4, fp) == 4 && memcmp(tag, JOY_EXT_TAG, 4) == 0 &&
+            fRead(ext, sizeof(short), 4 * JOY_SLOT_EXT_WORDS, fp)
+                == 4 * JOY_SLOT_EXT_WORDS)
+        {
+            bswap16_arr(ext, 4 * JOY_SLOT_EXT_WORDS);
+            memcpy(g_joystickSlotCfgExt, ext, sizeof ext);
+        }
+#endif
         fClose(fp);
     }
 }
@@ -623,8 +638,19 @@ void SyncJoystickSlots(void)
                 cfgDst[w] = g_joystickConfigWords[w];
             }
 
-            *(short *)(slotBase + 0x118) = g_joystickDeviceFlags[i];
+            /* Port: the rest of a new pad's bindings reset with the first ten. */
+            memcpy(g_joystickSlotCfgExt[i], &g_joystickConfigWords[JOY_SLOT_CFG_WORDS],
+                   sizeof g_joystickSlotCfgExt[i]);
         }
+
+        /* Button count — ScanKeyRemap's scan bound. The binary stores it only
+         * when the pad changes (0x477E18, inside the branch above); for it that
+         * is the same thing, since one named DirectInput device always reports
+         * one count. Here a pad's count depends on the build that published it,
+         * so a count loaded from JOYSTICK.INF is replaced by the live one even
+         * when the pad matches, or a stale one would hide buttons from the
+         * remap screen. */
+        *(short *)(slotBase + 0x118) = g_joystickDeviceFlags[i];
     }
 }
 

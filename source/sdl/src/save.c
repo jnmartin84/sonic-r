@@ -328,7 +328,8 @@ void ResetDemoCycle(void)
  * SavePadTypesImpl — 0x00477D54 — 63 bytes
  * Saves joystick/gamepad config to JOYSTICK.INF.
  * Binary: fopen("joystick.inf","wb"), fwrite(0x67541a, 0x11a, 4, fp), fclose
- * Writes 4 × 282 = 1128 bytes of joystick slot data.
+ * Writes 4 × 282 = 1128 bytes of joystick slot data. SDL builds append
+ * JOY_EXT_TAG and g_joystickSlotCfgExt (see gamepad_buttons.h).
  * Called from Shutdown (0x4CA362).
  * ===================================================================== */
 extern char g_joystickSlots[4][282];        /* 0x0067541A */
@@ -345,6 +346,16 @@ void SavePadTypesImpl(void)
         for (int s = 0; s < 4; s++) {
             bswap16_arr(g_joystickSlots[s] + 0x104, 11);
         }
+#ifndef SONICR_DC
+        /* Port: each pad's bindings past its slot's ten. After the four slots,
+         * so the original's 4 x 0x11A read is unaffected; read back by
+         * LoadJoystickConfig. The Dreamcast's VMU save stays the four slots. */
+        short ext[4][JOY_SLOT_EXT_WORDS];
+        memcpy(ext, g_joystickSlotCfgExt, sizeof ext);
+        bswap16_arr(ext, 4 * JOY_SLOT_EXT_WORDS);
+        fWrite(JOY_EXT_TAG, 1, 4, fp);
+        fWrite(ext, sizeof(short), 4 * JOY_SLOT_EXT_WORDS, fp);
+#endif
         fClose(fp);
     }
 }

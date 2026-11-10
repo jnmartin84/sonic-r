@@ -47,19 +47,31 @@ _Static_assert(GCBTN_LEFTSHOULDER == SDL_CONTROLLER_BUTTON_LEFTSHOULDER,
 _Static_assert(GCBTN_DPAD_UP == SDL_CONTROLLER_BUTTON_DPAD_UP, "GCBTN_DPAD_UP != SDL");
 _Static_assert(GCBTN_DPAD_RIGHT == SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
                "GCBTN_DPAD_RIGHT != SDL");
-/* The synthetic trigger indices must sit past every button we actually read
- * through SDL_GameControllerGetButton, which is 0..GCBTN_DPAD_RIGHT. SDL's enum
- * carries on past there (MISC1, paddles, touchpad) and we deliberately stop
- * mirroring it — so this is NOT an equality check against
- * SDL_CONTROLLER_BUTTON_MAX, whose value has grown across SDL releases. */
-_Static_assert(GCBTN_TRIGGER_LEFT > GCBTN_DPAD_RIGHT,
-               "trigger indices overlap a mirrored SDL button");
-_Static_assert(GC_BUTTON_COUNT == GCBTN_TRIGGER_RIGHT + 1,
-               "GC_BUTTON_COUNT does not cover both triggers");
+/* Past the d-pad the indices are ours (gamepad_buttons.h) and reach SDL through
+ * gamepad_button_held, so they must not overlap the mirrored range, and every
+ * one of them must fit in a pad's binding and pressed-state storage. */
+_Static_assert(GCBTN_TRIGGER_LEFT == GCBTN_DPAD_RIGHT + 1,
+               "own indices must start right after the mirrored SDL range");
+_Static_assert(GC_BUTTON_COUNT == GCBTN_TOUCHPAD + 1,
+               "GC_BUTTON_COUNT does not cover every index");
+_Static_assert(GC_BUTTON_COUNT <= JOY_MAX_BUTTONS,
+               "more controller buttons than a pad slot can hold");
+
+/* Index → SDL button for GCBTN_MISC1 onward, in index order. SDL added these
+ * in 2.0.14; built against an older SDL they simply never read as held. */
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+static const SDL_GameControllerButton s_gcExtraButtons[GC_BUTTON_COUNT - GCBTN_MISC1] = {
+    SDL_CONTROLLER_BUTTON_MISC1,     /* GCBTN_MISC1 */
+    SDL_CONTROLLER_BUTTON_PADDLE1,   /* GCBTN_PADDLE1 */
+    SDL_CONTROLLER_BUTTON_PADDLE2,   /* GCBTN_PADDLE2 */
+    SDL_CONTROLLER_BUTTON_PADDLE3,   /* GCBTN_PADDLE3 */
+    SDL_CONTROLLER_BUTTON_PADDLE4,   /* GCBTN_PADDLE4 */
+    SDL_CONTROLLER_BUTTON_TOUCHPAD,  /* GCBTN_TOUCHPAD */
+};
+#endif
 
 /* Gamepad state - up to 4 slots. */
 #define MAX_GAMEPADS 4
-#define JOY_BUTTONS_PER_SLOT 80
 
 /* One connected pad. `ctrl` non-NULL means SDL had a mapping for the device and
  * its buttons arrive as GCBTN_* indices; otherwise `joy` is set and the indices
@@ -83,17 +95,14 @@ static int s_padCount = 0;
  * (PollAllInputDevices loop at 0x00476BB1: ebx*5*16 = 80). */
 extern unsigned char g_keyPressState[320];
 
-/* Per-button bit-pattern config from the binary's joystick init.
- * g_joystickConfigWords[i] is the 16-bit pad-bit pattern OR'd into the
- * player input word when button index i is held. Defaults set by
- * InitJoystickConfig in init.c.
- *
- * Per-slot copy lives in g_joystickSlots[slot][0x104 + b*2] (10 shorts);
- * SyncJoystickSlots seeds it from g_joystickConfigWords on first run, the
- * in-game remap UI overwrites it. We read from the per-slot copy at poll
- * time so user remaps take effect. */
-extern short g_joystickConfigWords[];
+/* Per-pad button bindings: the 16-bit pad-bit pattern OR'd into the player
+ * input word while button index b is held. Indices below JOY_SLOT_CFG_WORDS
+ * live in the original slot at g_joystickSlots[slot][0x104 + b*2], the rest in
+ * g_joystickSlotCfgExt[slot]. SyncJoystickSlots seeds both from the defaults
+ * in g_joystickConfigWords (InitJoystickConfig, init.c) when a new pad turns
+ * up, and the in-game remap UI overwrites them. */
 extern char g_joystickSlots[4][282];   /* 0x0067541A */
+extern short g_joystickSlotCfgExt[4][JOY_SLOT_EXT_WORDS];
 extern char g_joystickDeviceNames[4][260]; /* 0x00675C54 — detected device
                                             * names, stride 0x104. The binary's
                                             * DirectInput enum callback fills
@@ -170,7 +179,7 @@ static int gamepad_open(int deviceIndex)
         if (pad.ctrl) {
             /* Fixed count: SDL synthesises every button in the layout whether
              * the hardware has it or not, so absent ones simply read as
-             * released. The two analog triggers are appended on the end. */
+             * released. See gamepad_buttons.h for the index layout. */
             pad.nButtons = GC_BUTTON_COUNT;
             name = SDL_GameControllerName(pad.ctrl);
         }
@@ -181,8 +190,8 @@ static int gamepad_open(int deviceIndex)
             return 0;
         }
         pad.nButtons = SDL_JoystickNumButtons(pad.joy);
-        if (pad.nButtons > JOY_BUTTONS_PER_SLOT) {
-            pad.nButtons = JOY_BUTTONS_PER_SLOT;
+        if (pad.nButtons > JOY_MAX_BUTTONS) {
+            pad.nButtons = JOY_MAX_BUTTONS;
         }
         name = SDL_JoystickName(pad.joy);
     }
@@ -190,14 +199,12 @@ static int gamepad_open(int deviceIndex)
     int s = s_padCount;
     s_pads[s] = pad;
 
-    /* Publish name and scan bound, then let SyncJoystickSlots decide whether the
-     * slot's stored mapping still belongs to the pad now sitting in it. The
-     * bound is the per-slot config capacity, NOT the device's button count — see
-     * JOY_SLOT_CFG_WORDS for why a button the commit cannot store must not be
-     * capturable in the first place. */
+    /* Publish name and button count, then let SyncJoystickSlots decide whether
+     * the slot's stored mapping still belongs to the pad now sitting in it. The
+     * count reaches slot[0x118], which is how far the remap UI scans — every
+     * button the pad has, since each one has a binding to store it in. */
     platform_publish_joystick_name(s, name);
-    g_joystickDeviceFlags[s] = (short)(pad.nButtons < JOY_SLOT_CFG_WORDS
-                                       ? pad.nButtons : JOY_SLOT_CFG_WORDS);
+    g_joystickDeviceFlags[s] = (short)pad.nButtons;
 
     s_padCount++;
     g_initFeatureC = s_padCount;
@@ -596,8 +603,8 @@ static void HandleSDLEvent(SDL_Event *event)
                 }
                 gamepad_close(i);
                 /* Clear pressed state for removed slot */
-                memset(&g_keyPressState[i * JOY_BUTTONS_PER_SLOT], 0,
-                    JOY_BUTTONS_PER_SLOT);
+                memset(&g_keyPressState[i * JOY_MAX_BUTTONS], 0,
+                    JOY_MAX_BUTTONS);
                 /* Shift remaining slots down */
                 for (int j = i; j < s_padCount - 1; j++) {
                     s_pads[j] = s_pads[j + 1];
@@ -654,7 +661,7 @@ void platform_pump_events(void)
  * first. Unmapped devices keep the old raw indices.
  *
  * Directions: on the controller path the d-pad arrives as buttons 11-14 and
- * flows through the config table like anything else. On the raw path there are
+ * flows through the bindings like anything else. On the raw path there are
  * no reliable d-pad indices, so the hat supplies directions and direction bits
  * are masked out of table lookups — otherwise a table written for GCBTN_*
  * ordinals would fire PAD_UP off some unrelated raw button. The left stick
@@ -667,7 +674,6 @@ void platform_pump_events(void)
  * ===================================================================== */
 
 #define STICK_DEADZONE_I 19660  /* 0.6 * 32767 */
-#define JOY_CFG_MAX      32     /* g_joystickConfigWords array size */
 
 int platform_init_gamepads(void)
 {
@@ -680,12 +686,17 @@ int platform_init_gamepads(void)
     return s_padCount;
 }
 
-/* Is button index `b` currently held? On the controller path the two indices
- * past the mirrored range (see gamepad_buttons.h) are the analog triggers,
- * thresholded into a digital press. */
+/* Is button index `b` currently held? On the controller path, indices up to
+ * the d-pad are SDL's own button ordinals; past that (see gamepad_buttons.h)
+ * come the two analog triggers, thresholded into a digital press, then the
+ * remaining SDL buttons via s_gcExtraButtons. */
 static int gamepad_button_held(const GamepadSlot *pad, int b)
 {
     if (pad->ctrl) {
+        if (b <= GCBTN_DPAD_RIGHT) {
+            return SDL_GameControllerGetButton(pad->ctrl,
+                       (SDL_GameControllerButton)b) != 0;
+        }
         if (b == GCBTN_TRIGGER_LEFT) {
             return SDL_GameControllerGetAxis(pad->ctrl,
                        SDL_CONTROLLER_AXIS_TRIGGERLEFT) > TRIGGER_THRESHOLD_I;
@@ -694,8 +705,13 @@ static int gamepad_button_held(const GamepadSlot *pad, int b)
             return SDL_GameControllerGetAxis(pad->ctrl,
                        SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > TRIGGER_THRESHOLD_I;
         }
-        return SDL_GameControllerGetButton(pad->ctrl,
-                   (SDL_GameControllerButton)b) != 0;
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+        if (b < GC_BUTTON_COUNT) {
+            return SDL_GameControllerGetButton(pad->ctrl,
+                       s_gcExtraButtons[b - GCBTN_MISC1]) != 0;
+        }
+#endif
+        return 0;
     }
     return SDL_JoystickGetButton(pad->joy, b) != 0;
 }
@@ -709,11 +725,11 @@ int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots)
 
     for (int i = 0; i < count; i++) {
         const GamepadSlot *pad = &s_pads[i];
-        unsigned char *pressBase = &g_keyPressState[i * JOY_BUTTONS_PER_SLOT];
+        unsigned char *pressBase = &g_keyPressState[i * JOY_MAX_BUTTONS];
 
         if (!pad->ctrl && !pad->joy) {
             joySlotState[i] = 0;
-            memset(pressBase, 0, JOY_BUTTONS_PER_SLOT);
+            memset(pressBase, 0, JOY_MAX_BUTTONS);
             continue;
         }
 
@@ -768,10 +784,9 @@ int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots)
         }
 
         /* Buttons — populate g_keyPressState (so ScanKeyRemap can scan during
-         * the remap UI), then OR in the bit pattern for each held button. The
-         * pattern comes from the per-slot config at slot[0x104 + b*2], which is
-         * what the remap UI commits to; indices past its capacity fall back to
-         * the shared g_joystickConfigWords[b]. */
+         * the remap UI), then OR in this pad's binding for each held button:
+         * slot[0x104 + b*2] for the first ten, g_joystickSlotCfgExt past
+         * that. Both are what the remap UI commits to. */
         const short *slotCfg = (const short *)&g_joystickSlots[i][0x104];
         for (int b = 0; b < pad->nButtons; b++) {
             int held = gamepad_button_held(pad, b);
@@ -782,10 +797,8 @@ int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots)
             short cfg;
             if (b < JOY_SLOT_CFG_WORDS) {
                 cfg = slotCfg[b];
-            } else if (b < JOY_CFG_MAX) {
-                cfg = g_joystickConfigWords[b];
             } else {
-                cfg = 0;
+                cfg = g_joystickSlotCfgExt[i][b - JOY_SLOT_CFG_WORDS];
             }
             if (pad->joy) {
                 /* Raw device: directions came from the hat/stick above, and this
@@ -795,7 +808,7 @@ int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots)
             bits |= (unsigned short)cfg;
         }
         /* Zero any trailing slots that this device doesn't have. */
-        for (int b = pad->nButtons; b < JOY_BUTTONS_PER_SLOT; b++) {
+        for (int b = pad->nButtons; b < JOY_MAX_BUTTONS; b++) {
             pressBase[b] = 0x00;
         }
 
@@ -807,8 +820,8 @@ int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots)
         joySlotState[i] = 0;
     }
     for (int i = count; i < MAX_GAMEPADS; i++) {
-        memset(&g_keyPressState[i * JOY_BUTTONS_PER_SLOT], 0,
-               JOY_BUTTONS_PER_SLOT);
+        memset(&g_keyPressState[i * JOY_MAX_BUTTONS], 0,
+               JOY_MAX_BUTTONS);
     }
 
     return count;

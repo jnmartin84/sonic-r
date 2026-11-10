@@ -158,7 +158,9 @@ static int g_optMusicTestSel;              /* 0x0068AF38 — Music Test selector
 static int s_musicTestTrack = -1;
 static int __attribute__((unused)) g_optSplashState;              /* 0x0068AF70 */
 
-static short g_optKeyRemapResult[16];     /* 0x0068B040 — remap output key IDs */
+/* Ten shorts in the binary (cleared at 0x494A72); one per button a pad can
+ * report here, since every button is capturable. */
+static short g_optKeyRemapResult[JOY_MAX_BUTTONS]; /* 0x0068B040 — remap output key IDs */
 static int   s_optKeyRemapTemp[10];       /* stack temp [ebp-0x50] in binary —
                                            * snapshot of current keymap for
                                            * cancel/restore via ESC */
@@ -206,8 +208,9 @@ static const short g_remapActionBits[4][6] = {
 
 /* Per-button "already-mapped this session" flag at 0x68b02c.
  * ScanKeyRemap checks/sets this so the user can't bind the same button
- * to two different actions in one remap pass. Cleared on entry. */
-static short s_remapMappedFlag[16];
+ * to two different actions in one remap pass. Cleared on entry. Sized like
+ * g_optKeyRemapResult above. */
+static short s_remapMappedFlag[JOY_MAX_BUTTONS];
 
 /* ROM SFX test table at 0x50421A — sound IDs indexed by g_optSfxTestSel.
  * Binary reads dword at [vol*2 + 0x50421A], then sar 16 → table[vol+1]. */
@@ -259,8 +262,8 @@ void SetPlayerCharacter(int playerIndex, int charId, int raceType)
  *
  * Args: slotPtr = &g_joystickSlots[g_optKeyRemapPlayer][0] (282-byte slot).
  *   slot[0x118] (short) = button count (filled by SyncJoystickSlots from
- *   g_joystickDeviceFlags, which platform_init_gamepads writes from
- *   SDL_JoystickNumButtons).
+ *   g_joystickDeviceFlags, which the platform layer writes when it opens the
+ *   pad — every button it has, at most JOY_MAX_BUTTONS).
  */
 static void ScanKeyRemap(char *slotPtr)
 {
@@ -1713,7 +1716,7 @@ int OptionsMenuScreen(void)
                             g_optKeyRemapFlag     = 1;        /* wait-for-release */
                             g_optKeyRemapPlayer   = slot;     /* 0x68b024 */
                             g_optEscGate          = 1;        /* gate2 */
-                            for (int i = 0; i < 10; i++) {
+                            for (int i = 0; i < JOY_MAX_BUTTONS; i++) { /* 0x494a5f / 0x494a72 */
                                 g_optKeyRemapResult[i] = 0;
                                 s_remapMappedFlag[i]   = 0;
                             }
@@ -1939,7 +1942,7 @@ int OptionsMenuScreen(void)
                  * have rebound, and wiping it just destroys it.
                  *
                  * That is exactly what killed the D-pad: on a Logitech Dual
-                 * Action the D-pad reports as buttons 6-9, all inside the ten
+                 * Action the D-pad reports as buttons 6-9, all inside the
                  * entries committed here and none of them among the six
                  * prompts, so every remap zeroed all four. (It survived when
                  * the pad's mode switch had the D-pad reporting as a hat
@@ -1947,16 +1950,26 @@ int OptionsMenuScreen(void)
                  * hardcoded bits, bypassing this table.)
                  *
                  * So: overwrite whatever the user actually bound, and leave a
-                 * direction entry alone when they did not touch that button. */
+                 * direction entry alone when they did not touch that button.
+                 *
+                 * The binary commits the ten entries at slot+0x104 (0x494e7d).
+                 * Buttons past those go to the port's g_joystickSlotCfgExt, so
+                 * every button the remap could capture is committed. */
                 if (g_optKeyRemapProgress >= cappedCount) {
-                    short *dst = (short *)(slotPtr + 0x104);
-                    for (int i = 0; i < 10; i++) {
+                    short *slotCfg = (short *)(slotPtr + 0x104);
+                    short *extCfg  = g_joystickSlotCfgExt[playerSlot];
+                    int commitCount = btnCount > JOY_SLOT_CFG_WORDS
+                                    ? btnCount : JOY_SLOT_CFG_WORDS;
+                    for (int i = 0; i < commitCount; i++) {
+                        short *dst = i < JOY_SLOT_CFG_WORDS
+                                   ? &slotCfg[i]
+                                   : &extCfg[i - JOY_SLOT_CFG_WORDS];
                         if (g_optKeyRemapResult[i] == 0 &&
-                            (dst[i] & PAD_DIRECTIONS) != 0)
+                            (*dst & PAD_DIRECTIONS) != 0)
                         {
                             continue;   /* untouched direction — keep it */
                         }
-                        dst[i] = g_optKeyRemapResult[i];
+                        *dst = g_optKeyRemapResult[i];
                     }
 #if 0
                     fprintf(stderr,

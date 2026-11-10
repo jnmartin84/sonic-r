@@ -9,6 +9,7 @@
 #include "player_struct.h"
 #include "vertex_struct.h"
 #include "collect_effect.h"
+#include "gamepad_buttons.h"    /* JOY_MAX_BUTTONS / JOY_SLOT_EXT_WORDS */
 
 /* Animation */
 int g_animFrameCounter;
@@ -1161,15 +1162,15 @@ short g_ghostSpriteData[32768];         /* 0x00910BC4 */
 
 /* Joystick/gamepad config structure at 0x675300 */
 char g_joystickNameBuf[282];            /* 0x00675300 — template: name + config */
-/* Originally 11 entries in the binary (one per button on a Microsoft
- * SideWinder pad). Extended here to 32 for modern controllers that
- * report more buttons via SDL_Joystick (e.g. Logitech Dual Action on
- * macOS reports 16 indices including stick clicks and split bumper/
- * trigger pairs). Entries beyond index 10 are zero-initialised by
- * default and only set if the active defaults or the in-game remap
- * UI assigns them. */
-short g_joystickConfigWords[32];        /* 0x00675404 — extended button-bit map */
+/* Default binding for every button index, which SyncJoystickSlots copies into
+ * a pad's slot when a new pad turns up. 11 entries in the binary (one per
+ * button on a Microsoft SideWinder pad); one per possible button here, since
+ * modern pads report far more. Indices the defaults leave alone are zero. */
+short g_joystickConfigWords[JOY_MAX_BUTTONS]; /* 0x00675404 — default button-bit map */
 char g_joystickSlots[4][282];           /* 0x0067541A — 4 player device slots */
+/* Per-pad bindings for button indices JOY_SLOT_CFG_WORDS and up — the original
+ * 282-byte slot only holds ten. Port addition; see gamepad_buttons.h. */
+short g_joystickSlotCfgExt[4][JOY_SLOT_EXT_WORDS];
 int g_joystickSlotActive[4];            /* 0x00675884 — per-slot active flags */
 short g_joystickDeviceFlags[8];         /* 0x00675C40 — per-device config flags */
 char g_joystickDeviceNames[4][260];     /* 0x00675C54 — detected device names, stride 0x104 */

@@ -847,9 +847,9 @@ void SetupViewportConfig(void)
  * driver indices, where this layout will be wrong and the user remaps via
  * the in-game joystick remap UI.
  *
- * Only indices below JOY_SLOT_CFG_WORDS are remappable per player; the rest
- * are shared across all four slots, which is why the two shoulders end up on
- * opposite sides of that line.
+ * Every index is a per-pad default: the first JOY_SLOT_CFG_WORDS are copied
+ * into the slot template below, as in the binary, and the rest seed
+ * g_joystickSlotCfgExt, the port's storage for bindings past those ten.
  * ===================================================================== */
 void InitJoystickConfig(void)
 {
@@ -880,21 +880,15 @@ void InitJoystickConfig(void)
      * Y camera, shoulders brake — so muscle memory carries between the two
      * ports. Both the shoulder buttons and the analog triggers brake, since
      * which of the two a player reaches for is a matter of habit. */
-    for (int k = 0; k < 32; k++) {
+    for (int k = 0; k < JOY_MAX_BUTTONS; k++) {
         g_joystickConfigWords[k] = 0;
     }
-    /* Remappable per player (below JOY_SLOT_CFG_WORDS). */
     g_joystickConfigWords[GCBTN_A]             = PAD_JUMP;   /* Jump (ACTION) */
     g_joystickConfigWords[GCBTN_B]             = PAD_ACCEL;  /* Accel; doubles as menu cancel */
     g_joystickConfigWords[GCBTN_X]             = PAD_ACCEL;  /* Accel — as on DC */
     g_joystickConfigWords[GCBTN_Y]             = PAD_CAMERA; /* Camera (3 height/zoom levels) */
     g_joystickConfigWords[GCBTN_START]         = PAD_START;  /* Start / Pause */
     g_joystickConfigWords[GCBTN_LEFTSHOULDER]  = PAD_DRIFTL; /* L.BRAKE */
-    /* Left unbound: GCBTN_BACK (PAD_ACCEL is already the cancel bit on B, and
-     * binding it here would make Back accelerate mid-race), GCBTN_GUIDE, and
-     * both stick clicks. */
-
-    /* Shared across all four slots — past the per-slot config's capacity. */
     g_joystickConfigWords[GCBTN_RIGHTSHOULDER] = PAD_DRIFTR; /* R.BRAKE */
     g_joystickConfigWords[GCBTN_DPAD_UP]       = PAD_UP;
     g_joystickConfigWords[GCBTN_DPAD_DOWN]     = PAD_DOWN;
@@ -902,11 +896,18 @@ void InitJoystickConfig(void)
     g_joystickConfigWords[GCBTN_DPAD_RIGHT]    = PAD_RIGHT;
     g_joystickConfigWords[GCBTN_TRIGGER_LEFT]  = PAD_DRIFTL;
     g_joystickConfigWords[GCBTN_TRIGGER_RIGHT] = PAD_DRIFTR;
+    /* Left unbound: GCBTN_BACK (PAD_ACCEL is already the cancel bit on B, and
+     * binding it here would make Back accelerate mid-race), GCBTN_GUIDE, both
+     * stick clicks, and MISC1 / the paddles / the touchpad. */
 #endif
 
     for (int i = 0; i < 4; i++) {
         memcpy(g_joystickSlots[i], g_joystickNameBuf, 282);
         g_joystickSlotActive[i] = 0;
+        /* Port: the slot's bindings past its ten start at the defaults too, so
+         * a JOYSTICK.INF that does not carry them still gets working buttons. */
+        memcpy(g_joystickSlotCfgExt[i], &g_joystickConfigWords[JOY_SLOT_CFG_WORDS],
+               sizeof g_joystickSlotCfgExt[i]);
     }
 }
 

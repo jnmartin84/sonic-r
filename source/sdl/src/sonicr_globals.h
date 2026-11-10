@@ -934,6 +934,8 @@ extern int g_vpClipRight10;
 extern int g_vpClipLeft16;
 extern int g_vpClipRight16;
 extern short g_joystickConfigWords[];          /* 0x675404 */
+#include "gamepad_buttons.h"                   /* JOY_SLOT_EXT_WORDS */
+extern short g_joystickSlotCfgExt[4][JOY_SLOT_EXT_WORDS]; /* port: bindings past slot+0x104's ten */
 extern int g_diDeviceReady;          /* 0x675c2c */
 extern unsigned short g_taGhostSource[];          /* 0x91498c */
 extern unsigned short *g_p1JoystickPtr;          /* 0x8fd6f0 */
