@@ -242,7 +242,7 @@ framework on macOS and Windows, and needs the Mesa dev package on Linux. (BearSS
 used by the online matchmaker for HTTPS, is bundled in this repo — nothing to
 install.)
 
-- **macOS:** `brew install sdl2 sdl2_mixer miniupnpc`
+- **macOS:** `brew install sdl2 sdl2_mixer miniupnpc pkg-config`
 - **Linux (Debian/Ubuntu):** `sudo apt install build-essential libsdl2-dev libsdl2-mixer-dev libminiupnpc-dev libgl1-mesa-dev`
 - **Windows:** [MSYS2](https://www.msys2.org/), UCRT64 shell. The Windows build
   links **statically**, so SDL2_mixer's audio-codec libraries must be installed
