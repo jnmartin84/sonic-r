@@ -111,39 +111,79 @@ void CloseCDDevice(void)
  * The .son/.adx shims stream through SDL_mixer's WAV backend, so no whole-track
  * decode is held in RAM. freesrc=1 hands ownership of the RWops to SDL_mixer.
  */
+/**
+ * find_track_file — search for a track across directory, prefix, padding, and extension variants.
+ * Probes candidate paths in preference order; returns 1 and copies the path if found, 0 otherwise.
+ */
+static int find_track_file(int trackNum, const char *const exts[], int numExts, char *outPath, size_t outSize)
+{
+    static const char *const dirs[] = { "MUSIC", "music", "Music" };
+    static const char *const prefixes[] = { "track", "Track", "TRACK" };
+    char numBuf[16];
+
+    for (int e = 0; e < numExts; e++) {
+        for (int d = 0; d < (int)(sizeof(dirs) / sizeof(dirs[0])); d++) {
+            for (int p = 0; p < (int)(sizeof(prefixes) / sizeof(prefixes[0])); p++) {
+                for (int pad = 0; pad <= (trackNum < 10 ? 1 : 0); pad++) {
+                    if (pad) {
+                        snprintf(numBuf, sizeof(numBuf), "%02d", trackNum);
+                    } else {
+                        snprintf(numBuf, sizeof(numBuf), "%d", trackNum);
+                    }
+                    snprintf(outPath, outSize, DATA_DIR "/%s/%s%s.%s",
+                             dirs[d], prefixes[p], numBuf, exts[e]);
+                    FILE *fp = fopen(outPath, "rb");
+                    if (fp) {
+                        fclose(fp);
+                        return 1;
+                    }
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 static Mix_Music *load_track(int trackNum)
 {
     char path[512];
     SDL_RWops *rw;
 
-    snprintf(path, sizeof(path), DATA_DIR "/MUSIC/track%d.son", trackNum);
-    rw = MusicRW_OpenSon(path, 44100, 2, 16);
-    if (rw) {
-        return Mix_LoadMUS_RW(rw, 1);
-    }
-
-    snprintf(path, sizeof(path), DATA_DIR "/MUSIC/track%d.adx", trackNum);
-    rw = MusicRW_OpenAdx(path);
-    if (rw) {
-        return Mix_LoadMUS_RW(rw, 1);
-    }
-
-    snprintf(path, sizeof(path), DATA_DIR "/MUSIC/track%d.adp", trackNum);
-    rw = MusicRW_OpenAdp(path, 44100, 2);
-    if (rw) {
-        return Mix_LoadMUS_RW(rw, 1);
-    }
-
-    static const char *const exts[] = { "ogg", "mp3", "flac", "wav" };
-    for (int i = 0; i < (int)(sizeof(exts) / sizeof(exts[0])); i++) {
-        snprintf(path, sizeof(path), DATA_DIR "/MUSIC/track%d.%s", trackNum, exts[i]);
-        FILE *tf = fopen(path, "rb");
-        if (tf) {
-            fclose(tf);
-            Mix_Music *mm = Mix_LoadMUS(path);
-            if (mm) return mm;
+    static const char *const son_exts[] = { "son", "SON" };
+    if (find_track_file(trackNum, son_exts, 2, path, sizeof(path))) {
+        rw = MusicRW_OpenSon(path, 44100, 2, 16);
+        if (rw) {
+            return Mix_LoadMUS_RW(rw, 1);
         }
     }
+
+    static const char *const adx_exts[] = { "adx", "ADX" };
+    if (find_track_file(trackNum, adx_exts, 2, path, sizeof(path))) {
+        rw = MusicRW_OpenAdx(path);
+        if (rw) {
+            return Mix_LoadMUS_RW(rw, 1);
+        }
+    }
+
+    static const char *const adp_exts[] = { "adp", "ADP" };
+    if (find_track_file(trackNum, adp_exts, 2, path, sizeof(path))) {
+        rw = MusicRW_OpenAdp(path, 44100, 2);
+        if (rw) {
+            return Mix_LoadMUS_RW(rw, 1);
+        }
+    }
+
+    static const char *const exts[] = {
+        "ogg", "OGG",
+        "mp3", "MP3",
+        "flac", "FLAC",
+        "wav", "WAV"
+    };
+    if (find_track_file(trackNum, exts, (int)(sizeof(exts) / sizeof(exts[0])), path, sizeof(path))) {
+        Mix_Music *mm = Mix_LoadMUS(path);
+        if (mm) return mm;
+    }
+
     return NULL;
 }
 
