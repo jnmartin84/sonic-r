@@ -54,7 +54,7 @@ int g_precompSpeed3;     /* DAT_00540040 */
 int g_precompSpeed4;     /* DAT_00540044 */
 int g_rbUnknown54;       /* DAT_00540054 — per-track value (3,4,3,2), only written */
 int g_aiTurnThreshold;   /* DAT_00540060 — per-track AI steering threshold */
-int g_gpTopPositions = 1;/* g_gpTopPositions — GP top position flag */
+int g_gpTopPositions = 0;/* g_gpTopPositions — GP top position flag */
 extern int g_difficultyParam;   /* canonical in globals_extra.c */
 unsigned char g_difficultyModeC; /* 0x8FB9A0 — difficulty/unlock state byte */
 unsigned char g_gpWonBits;       /* 0x8FB9A1 — championship: tracks the player has won */
